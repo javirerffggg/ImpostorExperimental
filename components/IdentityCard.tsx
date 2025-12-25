@@ -38,9 +38,45 @@ export const IdentityCard: React.FC<Props> = ({ player, theme, color, onRevealSt
         setIsHolding(false);
         setDragPosition({ x: 0, y: 0 });
         totalViewTime.current = 0; // Reset time accumulator
+        isPointerDown.current = false; // Ensure pointer state resets
     }, [player.id]);
 
-    // Haptic feedback
+    // --- GLOBAL SAFETY NET: Ensure card drops if pointer event is lost ---
+    useEffect(() => {
+        const handleGlobalRelease = () => {
+            // If the code thinks the pointer is down, but a global release happened: FORCE RESET
+            if (isPointerDown.current) {
+                isPointerDown.current = false;
+                setIsDragging(false);
+                setDragPosition({ x: 0, y: 0 });
+
+                // Accumulate time before stopping
+                if (viewStartTime.current > 0) {
+                    const duration = Date.now() - viewStartTime.current;
+                    totalViewTime.current += duration;
+                    viewStartTime.current = 0;
+                }
+
+                setIsHolding(false);
+                onRevealEnd();
+            }
+        };
+
+        // Listen to window to catch lifts outside the element or system interruptions
+        window.addEventListener('pointerup', handleGlobalRelease);
+        window.addEventListener('touchend', handleGlobalRelease);
+        window.addEventListener('pointercancel', handleGlobalRelease);
+        window.addEventListener('blur', handleGlobalRelease); // If user switches apps
+
+        return () => {
+            window.removeEventListener('pointerup', handleGlobalRelease);
+            window.removeEventListener('touchend', handleGlobalRelease);
+            window.removeEventListener('pointercancel', handleGlobalRelease);
+            window.removeEventListener('blur', handleGlobalRelease);
+        };
+    }, [onRevealEnd]); // Dependency stable
+
+    // Haptics
     const vibrate = (pattern: number[]) => {
         if (navigator.vibrate) navigator.vibrate(pattern);
     };
@@ -49,12 +85,10 @@ export const IdentityCard: React.FC<Props> = ({ player, theme, color, onRevealSt
         e.preventDefault(); 
         e.stopPropagation();
 
-        // FIX: Capture pointer to prevent "losing" the touch when card lifts
+        // Try to capture, but rely on global listener if this fails
         try {
             (e.currentTarget as Element).setPointerCapture(e.pointerId);
-        } catch (err) {
-            // Fallback for environments where pointer capture might fail
-        }
+        } catch (err) { }
 
         isPointerDown.current = true;
         startPos.current = { x: e.clientX, y: e.clientY };
@@ -69,7 +103,7 @@ export const IdentityCard: React.FC<Props> = ({ player, theme, color, onRevealSt
         
         // Immediate Haptics
         if (player.isImp) {
-            vibrate([50, 50, 50, 50, 100]); // More chaotic vibration for glitch
+            vibrate([50, 50, 50, 50, 100]); 
         } else {
             vibrate([40]); 
         }
@@ -82,13 +116,12 @@ export const IdentityCard: React.FC<Props> = ({ player, theme, color, onRevealSt
         const deltaX = e.clientX - startPos.current.x;
         const deltaY = e.clientY - startPos.current.y;
 
-        // Threshold to switch to direct 1:1 dragging (removes transition)
-        // This prevents micro-movements from snapping the card instantly
+        // Threshold to switch to direct 1:1 dragging
         if (!isDragging && Math.hypot(deltaX, deltaY) > 5) {
             setIsDragging(true);
         }
 
-        const resistance = 0.6; // Slightly loose resistance to feel fluid
+        const resistance = 0.6; 
         setDragPosition({
             x: deltaX * resistance,
             y: deltaY * resistance
@@ -97,29 +130,27 @@ export const IdentityCard: React.FC<Props> = ({ player, theme, color, onRevealSt
 
     const handlePointerUp = (e: React.PointerEvent) => {
         e.preventDefault();
-        
-        // Release capture
         try {
             (e.currentTarget as Element).releasePointerCapture(e.pointerId);
         } catch (e) { /* ignore */ }
 
-        isPointerDown.current = false;
-        setIsDragging(false); 
-        
-        // Stop Timer & Accumulate
-        if (viewStartTime.current > 0) {
-            const duration = Date.now() - viewStartTime.current;
-            totalViewTime.current += duration;
-            viewStartTime.current = 0;
-        }
-        
-        // Reset position on release
-        setDragPosition({ x: 0, y: 0 });
+        // Logic handled by Global Listener, but we execute here for immediate responsiveness
+        // The Global Listener checks isPointerDown.current, so we set it false here to avoid double execution
+        if (isPointerDown.current) {
+            isPointerDown.current = false;
+            setIsDragging(false); 
+            setDragPosition({ x: 0, y: 0 });
 
-        // Stop revealing
-        if (isHolding) {
-            setIsHolding(false);
-            onRevealEnd();
+            if (viewStartTime.current > 0) {
+                const duration = Date.now() - viewStartTime.current;
+                totalViewTime.current += duration;
+                viewStartTime.current = 0;
+            }
+
+            if (isHolding) {
+                setIsHolding(false);
+                onRevealEnd();
+            }
         }
     };
 
@@ -136,8 +167,7 @@ export const IdentityCard: React.FC<Props> = ({ player, theme, color, onRevealSt
             <div 
                 className="fixed inset-0 pointer-events-none transition-all duration-1000 ease-in-out"
                 style={{ 
-                    // Changed from 'screen' to 'normal' to ensure visibility on Light Themes (Andaluz, Solar, etc.)
-                    // Adjusted opacity slightly to prevent it from being overwhelming on Dark Themes
+                    // Changed from 'screen' to 'normal' to ensure visibility on Light Themes
                     background: `radial-gradient(circle at 50% 50%, ${color}40 0%, ${color}00 70%, transparent 100%)`,
                     zIndex: 0,
                     opacity: 0.6,
@@ -158,9 +188,7 @@ export const IdentityCard: React.FC<Props> = ({ player, theme, color, onRevealSt
                 <div 
                     className="w-full aspect-[3/4] relative"
                     style={{
-                        // Apply breathe animation to wrapper so it doesn't conflict with inner transform transitions
                         animation: (!isHolding && !hasInteracted && !isDragging) ? 'breathe 4s ease-in-out infinite' : 'none',
-                        // Smooth out the scale snap when animation stops
                         transition: 'transform 0.3s ease-out'
                     }}
                 >
@@ -170,6 +198,7 @@ export const IdentityCard: React.FC<Props> = ({ player, theme, color, onRevealSt
                         onPointerMove={handlePointerMove}
                         onPointerUp={handlePointerUp}
                         onPointerCancel={handlePointerUp}
+                        onContextMenu={(e) => e.preventDefault()} // Prevent context menu
                         style={{ 
                             '--card-color': color,
                             '--card-shadow-weak': `${color}40`,
@@ -178,18 +207,14 @@ export const IdentityCard: React.FC<Props> = ({ player, theme, color, onRevealSt
                             background: `linear-gradient(135deg, ${theme.cardBg} 0%, ${color}33 100%)`,
                             borderColor: isHolding ? color : theme.border,
                             borderRadius: theme.radius,
-                            
                             boxShadow: isHolding ? `0 0 50px ${color}60` : '0 10px 30px rgba(0,0,0,0.5)',
                             
-                            // Transition logic: smooth return when released, instant follow when dragging
                             transition: isDragging 
                                 ? 'none' 
                                 : 'transform 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.3s ease, border-color 0.3s ease',
                             
-                            // Lift card up by 40px when holding, plus drag position
                             transform: `translate3d(${dragPosition.x}px, ${dragPosition.y + (isHolding ? -40 : 0)}px, 0) rotate(${dragPosition.x * 0.05}deg)`,
                             
-                            // Standard pulse for civil, NO animation here for Impostor because we handle glitch manually inside
                             animation: (isHolding && !player.isImp) ? 'reveal-pulse 2s infinite' : 'none',
                             touchAction: 'none',
                             cursor: isDragging ? 'grabbing' : 'grab'
