@@ -21,7 +21,7 @@ export const ArchitectCuration: React.FC<Props> = ({ architect, currentOptions, 
         setTimeout(() => {
             setIsScanning(false);
             setStep('selection');
-        }, 2000);
+        }, 1500); // Slightly faster transition
     };
 
     if (step === 'auth') {
@@ -42,12 +42,9 @@ export const ArchitectCuration: React.FC<Props> = ({ architect, currentOptions, 
                         />
                     </div>
                     
-                    <div className="space-y-2">
-                        <p style={{ color: theme.sub }} className="text-[10px] font-black uppercase tracking-[0.3em]">
-                            NIVEL DE ACCESO REQUERIDO
-                        </p>
-                        <h2 style={{ color: theme.text }} className="text-2xl font-black uppercase">
-                            Agente {architect.name}
+                    <div className="space-y-4">
+                         <h2 style={{ color: theme.text }} className="text-xl font-black uppercase leading-snug">
+                            {architect.name}, te ha tocado elegir la palabra de la ronda
                         </h2>
                     </div>
 
@@ -57,7 +54,7 @@ export const ArchitectCuration: React.FC<Props> = ({ architect, currentOptions, 
                         style={{ backgroundColor: theme.accent, color: '#ffffff' }}
                         className="w-full py-4 rounded-xl font-bold uppercase tracking-widest text-xs shadow-lg active:scale-95 transition-all"
                     >
-                        {isScanning ? 'ESCANEANDO...' : 'CONFIRMAR BIOMETRÍA'}
+                        {isScanning ? 'ACCEDIENDO...' : 'ACEPTAR'}
                     </button>
                 </div>
             </div>
@@ -67,17 +64,10 @@ export const ArchitectCuration: React.FC<Props> = ({ architect, currentOptions, 
     return (
         <div className="flex flex-col h-full items-center justify-between p-6 pb-12 relative z-10 animate-in slide-in-from-right duration-500 pt-[calc(2rem+env(safe-area-inset-top))]">
             {/* Header */}
-            <div className="text-center w-full">
-                <div 
-                    className="inline-flex items-center gap-2 px-3 py-1 rounded-full border mb-4 backdrop-blur-md"
-                    style={{ borderColor: theme.border, backgroundColor: theme.cardBg }}
-                >
-                    <ShieldCheck size={12} className="text-yellow-500" />
-                    <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: theme.text }}>PROTOCOLO ARQUITECTO v5.0</span>
-                </div>
-                <h3 className="text-xl font-bold mb-1" style={{ color: theme.text }}>Selección de Misión</h3>
-                <p style={{ color: theme.sub }} className="text-xs max-w-xs mx-auto">
-                    Elige la palabra clave para los civiles. La del impostor permanecerá oculta.
+            <div className="text-center w-full mt-4">
+                <h3 className="text-2xl font-bold mb-2" style={{ color: theme.text }}>Selección de Palabra</h3>
+                <p style={{ color: theme.sub }} className="text-sm font-medium max-w-xs mx-auto leading-relaxed">
+                    Eres un civil. Elige la palabra que se va a jugar en la ronda.
                 </p>
             </div>
 
@@ -127,9 +117,11 @@ export const ArchitectCuration: React.FC<Props> = ({ architect, currentOptions, 
 
             {/* Controls */}
             <div className="w-full max-w-sm space-y-3">
-                <div className="flex items-center justify-center gap-2 mb-2 opacity-70">
-                    <EyeOff size={14} style={{ color: theme.text }} />
-                    <span className="text-[10px] uppercase tracking-wide" style={{ color: theme.text }}>Palabra Impostor: Oculta</span>
+                <div className="flex items-start justify-center gap-2 mb-2 opacity-70 px-2">
+                    <EyeOff size={14} style={{ color: theme.text, flexShrink: 0, marginTop: 3 }} />
+                    <span className="text-[10px] uppercase tracking-wide text-center leading-snug" style={{ color: theme.text }}>
+                        En el caso de que el modo pista esté activado, el impostor recibirá la pista que corresponda para la palabra que elijas
+                    </span>
                 </div>
 
                 <button 
@@ -143,7 +135,7 @@ export const ArchitectCuration: React.FC<Props> = ({ architect, currentOptions, 
                     className="w-full py-4 rounded-xl border font-bold uppercase tracking-widest text-xs flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed transition-all active:scale-95 hover:opacity-80 backdrop-blur-md"
                 >
                     <RefreshCw size={16} className={regenCount < 3 ? "" : ""} />
-                    Nuevas Órdenes ({3 - regenCount} restantes)
+                    Nuevas Palabras ({3 - regenCount} restantes)
                 </button>
             </div>
         </div>

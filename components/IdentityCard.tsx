@@ -136,10 +136,12 @@ export const IdentityCard: React.FC<Props> = ({ player, theme, color, onRevealSt
             <div 
                 className="fixed inset-0 pointer-events-none transition-all duration-1000 ease-in-out"
                 style={{ 
-                    background: `radial-gradient(circle at 50% 50%, ${color}40 0%, ${color}10 50%, transparent 80%)`,
+                    // Changed from 'screen' to 'normal' to ensure visibility on Light Themes (Andaluz, Solar, etc.)
+                    // Adjusted opacity slightly to prevent it from being overwhelming on Dark Themes
+                    background: `radial-gradient(circle at 50% 50%, ${color}40 0%, ${color}00 70%, transparent 100%)`,
                     zIndex: 0,
-                    opacity: 0.8,
-                    mixBlendMode: 'screen'
+                    opacity: 0.6,
+                    mixBlendMode: 'normal'
                 }}
             />
 
