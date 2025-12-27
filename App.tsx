@@ -270,7 +270,12 @@ const ResultsView: React.FC<{
                                     <div className="w-8 h-8 rounded-full flex items-center justify-center bg-red-500/10 text-red-500">
                                         <ScanEye size={16} />
                                     </div>
-                                    <span className="text-lg font-bold tracking-wide" style={{ color: theme.text }}>{imp.name}</span>
+                                    <div className="flex-1 flex justify-between items-center">
+                                        <span className="text-lg font-bold tracking-wide" style={{ color: theme.text }}>{imp.name}</span>
+                                        <span className="text-xs font-mono font-bold opacity-60" style={{ color: theme.text }}>
+                                            {Math.round(imp.impostorProbability)}%
+                                        </span>
+                                    </div>
                                 </div>
                             ))
                         )}
@@ -307,7 +312,12 @@ const ResultsView: React.FC<{
                                     <div>
                                         <div className="flex items-center gap-2">
                                             <span className="font-bold text-sm" style={{ color: theme.text }}>{p.name}</span>
-                                            {isImp && <span className="text-[8px] px-1 rounded bg-red-500/20 text-red-500 font-black">IMP</span>}
+                                            {isImp && (
+                                                <>
+                                                    <span className="text-[8px] px-1 rounded bg-red-500/20 text-red-500 font-black">IMP</span>
+                                                    <span className="text-[8px] font-mono opacity-60" style={{ color: theme.sub }}>{Math.round(p.impostorProbability)}%</span>
+                                                </>
+                                            )}
                                             {p.isArchitect && <span className="text-[8px] px-1 rounded bg-yellow-500/20 text-yellow-600 font-black">ARQ</span>}
                                         </div>
                                         <div className="flex items-center gap-2 mt-0.5">
