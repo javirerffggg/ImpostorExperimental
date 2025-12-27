@@ -783,5 +783,215 @@ export const CATEGORIES_DATA: Record<string, CategoryData[]> = {
         { civ: "Humedad", imp: "Agua", hints: ["Aire", "Mojado", "Gesto"] },
         { civ: "Huracán", imp: "Giro", hints: ["Viento", "Miedo", "Giro"] },
         { civ: "Tornado", imp: "Embudo", hints: ["Aire", "Giro", "Cielo"] }
+    ],
+    "Series de Éxito": [
+        { civ: "La Casa de Papel", imp: "Vis a Vis", hints: ["Netflix", "Prisión", "España"] },
+        { civ: "Stranger Things", imp: "Dark", hints: ["Niños", "Misterio", "Años 80"] },
+        { civ: "Juego de Tronos", imp: "The Witcher", hints: ["Fantasía", "Dragones", "Espadas"] },
+        { civ: "Breaking Bad", imp: "Narcos", hints: ["Drogas", "Química", "Crimen"] },
+        { civ: "Élite", imp: "Rebelde", hints: ["Instituto", "Ricos", "Drama"] }
+    ],
+    "Dibujos Animados Retro": [
+        { civ: "Oliver y Benji", imp: "Campeones", hints: ["Fútbol", "Infancia", "Campo Infinito"] },
+        { civ: "Dragon Ball", imp: "Caballeros del Zodiaco", hints: ["Lucha", "Anime", "Bolas"] },
+        { civ: "Doraemon", imp: "Shin Chan", hints: ["Japón", "Niño", "Inventos"] },
+        { civ: "Pokémon", imp: "Digimon", hints: ["Monstruos", "Evolución", "Colección"] },
+        { civ: "Los Simpsons", imp: "Padre de Familia", hints: ["Amarillo", "Comedia", "Padre"] }
+    ],
+    "Iconos del Pop": [
+        { civ: "Rosalía", imp: "C. Tangana", hints: ["Música", "Grammy", "Motomami"] },
+        { civ: "Aitana", imp: "Lola Índigo", hints: ["Operación Triunfo", "Pop", "Cantante"] },
+        { civ: "Bad Gyal", imp: "Karol G", hints: ["Urbano", "Baile", "Autotune"] },
+        { civ: "Shakira", imp: "Jennifer Lopez", hints: ["Latina", "Baile", "Mundial"] },
+        { civ: "Harry Styles", imp: "Justin Bieber", hints: ["Ídolo", "Pop", "Moda"] }
+    ],
+    "Cine de Terror": [
+        { civ: "Drácula", imp: "Nosferatu", hints: ["Vampiro", "Noche", "Colmillos"] },
+        { civ: "It", imp: "Annabelle", hints: ["Payaso", "Miedo", "Muñeca"] },
+        { civ: "El Exorcista", imp: "Poltergeist", hints: ["Posesión", "Cama", "Grito"] },
+        { civ: "Scream", imp: "Halloween", hints: ["Máscara", "Cuchillo", "Slasher"] },
+        { civ: "Alien", imp: "Predator", hints: ["Espacio", "Monstruo", "Miedo"] }
+    ],
+    "Mundo Gamer": [
+        { civ: "Minecraft", imp: "Roblox", hints: ["Cubos", "Online", "Construcción"] },
+        { civ: "Fortnite", imp: "Apex Legends", hints: ["Battle Royale", "Disparos", "Mapa"] },
+        { civ: "League of Legends", imp: "Dota 2", hints: ["PC", "Estrategia", "Torreta"] },
+        { civ: "Super Mario", imp: "Sonic", hints: ["Plataformas", "Salto", "Clásico"] },
+        { civ: "Zelda", imp: "Elden Ring", hints: ["Aventura", "Espada", "Mundo Abierto"] }
+    ],
+    "Universo Marvel/DC": [
+        { civ: "Iron Man", imp: "Batman", hints: ["Millonario", "Héroe", "Tecnología"] },
+        { civ: "Spider-Man", imp: "Deadpool", hints: ["Máscara", "Rojo", "Salto"] },
+        { civ: "Thor", imp: "Superman", hints: ["Capa", "Volar", "Fuerza"] },
+        { civ: "Vengadores", imp: "Liga de la Justicia", hints: ["Equipo", "Cine", "Héroes"] },
+        { civ: "Joker", imp: "Thanos", hints: ["Villano", "Malo", "Caos"] }
+    ],
+    "Gastronomía Regional": [
+        { civ: "Cocido Madrileño", imp: "Fabada Asturiana", hints: ["Legumbres", "Plato", "Cuchara"] },
+        { civ: "Salmorejo", imp: "Gazpacho", hints: ["Tomate", "Frío", "Andalucía"] },
+        { civ: "Pulpo a la Gallega", imp: "Calamares", hints: ["Marisco", "Plato", "Aceite"] },
+        { civ: "Ensaimada", imp: "Sobrasada", hints: ["Baleares", "Comida", "Isla"] },
+        { civ: "Pintxo", imp: "Tapa", hints: ["Bar", "Pequeño", "Palillo"] }
+    ],
+    "Monumentos Nacionales": [
+        { civ: "La Alhambra", imp: "La Mezquita", hints: ["Andalucía", "Historia", "Arquitectura"] },
+        { civ: "Sagrada Familia", imp: "Catedral de Burgos", hints: ["Iglesia", "Piedra", "Turismo"] },
+        { civ: "Acueducto de Segovia", imp: "Muralla de Ávila", hints: ["Piedra", "Castilla", "Antiguo"] },
+        { civ: "Teatro de Mérida", imp: "Itálica", hints: ["Roma", "Ruinas", "Cultura"] },
+        { civ: "Guggenheim", imp: "Ciudad de las Ciencias", hints: ["Moderno", "Museo", "Metal"] }
+    ],
+    "Fiestas Populares": [
+        { civ: "San Fermín", imp: "Fallas", hints: ["Multitud", "Tradición", "Evento"] },
+        { civ: "Semana Santa", imp: "Romería", hints: ["Religión", "Paso", "Calle"] },
+        { civ: "Carnaval", imp: "Orgullo", hints: ["Disfraz", "Música", "Fiesta"] },
+        { civ: "Tomatina", imp: "Batalla del Vino", hints: ["Comida", "Mancha", "Pueblo"] },
+        { civ: "Feria de Abril", imp: "El Rocío", hints: ["Sevilla", "Caballo", "Baile"] }
+    ],
+    "Islas del Archipiélago": [
+        { civ: "Ibiza", imp: "Mallorca", hints: ["Baleares", "Mar", "Fiesta"] },
+        { civ: "Tenerife", imp: "Gran Canaria", hints: ["Canarias", "Volcán", "Sol"] },
+        { civ: "Formentera", imp: "Menorca", hints: ["Cala", "Tranquilo", "Agua Turquesa"] },
+        { civ: "Lanzarote", imp: "Fuerteventura", hints: ["Viento", "Arena", "Canarias"] },
+        { civ: "La Gomera", imp: "El Hierro", hints: ["Pequeña", "Isla", "Naturaleza"] }
+    ],
+    "Supermercados Locales": [
+        { civ: "Mercadona", imp: "Carrefour", hints: ["Compra", "Comida", "Hacendado"] },
+        { civ: "Lidl", imp: "Aldi", hints: ["Alemán", "Barato", "Oferta"] },
+        { civ: "Dia", imp: "Alcampo", hints: ["Barrio", "Supermercado", "Tienda"] },
+        { civ: "El Corte Inglés", imp: "Fnac", hints: ["Centro", "Ropa", "Caro"] },
+        { civ: "Bershka", imp: "Zara", hints: ["Ropa", "Tienda", "Inditex"] }
+    ],
+    "Cuerpo Humano (Órganos)": [
+        { civ: "Hígado", imp: "Páncreas", hints: ["Interior", "Vital", "Filtro"] },
+        { civ: "Pulmones", imp: "Corazón", hints: ["Pecho", "Aire", "Vida"] },
+        { civ: "Cerebro", imp: "Médula", hints: ["Cabeza", "Pensar", "Nervios"] },
+        { civ: "Riñones", imp: "Vejiga", hints: ["Agua", "Filtro", "Cuerpo"] },
+        { civ: "Estómago", imp: "Intestino", hints: ["Comida", "Digestión", "Vientre"] }
+    ],
+    "Astronomía": [
+        { civ: "Agujero Negro", imp: "Supernova", hints: ["Espacio", "Gravedad", "Muerte Estelar"] },
+        { civ: "Marte", imp: "Júpiter", hints: ["Planeta", "Rojo", "Sistema Solar"] },
+        { civ: "Vía Láctea", imp: "Andrómeda", hints: ["Galaxia", "Estrellas", "Espacio"] },
+        { civ: "Cometa", imp: "Asteroide", hints: ["Cielo", "Roca", "Velocidad"] },
+        { civ: "Telescopio", imp: "Satélite", hints: ["Ver", "Lente", "Espacio"] }
+    ],
+    "Elementos Químicos": [
+        { civ: "Oro", imp: "Plata", hints: ["Metal", "Joyas", "Valor"] },
+        { civ: "Hierro", imp: "Cobre", hints: ["Metal", "Duro", "Herramienta"] },
+        { civ: "Oxígeno", imp: "Hidrógeno", hints: ["Gas", "Aire", "Invisible"] },
+        { civ: "Mercurio", imp: "Plomo", hints: ["Tóxico", "Metal", "Pesado"] },
+        { civ: "Carbono", imp: "Diamante", hints: ["Materia", "Vida", "Negro"] }
+    ],
+    "Clima Extremo": [
+        { civ: "Tsunami", imp: "Marejada", hints: ["Agua", "Peligro", "Ola"] },
+        { civ: "Huracán", imp: "Tornado", hints: ["Viento", "Giro", "Tormenta"] },
+        { civ: "Sequía", imp: "Ola de Calor", hints: ["Sol", "Sed", "Tierra Seca"] },
+        { civ: "Nevada", imp: "Ventisca", hints: ["Frío", "Blanco", "Invierno"] },
+        { civ: "Inundación", imp: "Riada", hints: ["Lluvia", "Agua", "Calle"] }
+    ],
+    "Tecnología del Mañana": [
+        { civ: "Coche Volador", imp: "Dron de Pasajeros", hints: ["Futuro", "Volar", "Cielo"] },
+        { civ: "Teletransporte", imp: "Viaje en el Tiempo", hints: ["Ciencia Ficción", "Movimiento", "Imposible"] },
+        { civ: "IA Sentiente", imp: "Cyborg", hints: ["Mente", "Robot", "Futuro"] },
+        { civ: "Base en Marte", imp: "Estación Lunar", hints: ["Espacio", "Vivir", "Planeta"] },
+        { civ: "Realidad Inmersiva", imp: "Metaverso", hints: ["Gafas", "Mundo", "Virtual"] }
+    ],
+    "Herramientas de Bricolaje": [
+        { civ: "Taladro", imp: "Atornillador", hints: ["Taller", "Mano", "Agujero"] },
+        { civ: "Sierra", imp: "Radial", hints: ["Corte", "Dientes", "Metal"] },
+        { civ: "Martillo", imp: "Maza", hints: ["Golpe", "Clavo", "Fuerza"] },
+        { civ: "Lijadora", imp: "Cepillo", hints: ["Madera", "Suave", "Polvo"] },
+        { civ: "Llave Inglesa", imp: "Alicates", hints: ["Tuerca", "Metal", "Apretar"] }
+    ],
+    "Oficios en Extinción": [
+        { civ: "Afilador", imp: "Paragüero", hints: ["Tradición", "Calle", "Flauta"] },
+        { civ: "Carbonero", imp: "Leñador", hints: ["Fuego", "Antiguo", "Negro"] },
+        { civ: "Relojero", imp: "Zapatero", hints: ["Arreglo", "Mano", "Taller"] },
+        { civ: "Sereno", imp: "Pregonero", hints: ["Noche", "Voz", "Pueblo"] },
+        { civ: "Molinero", imp: "Herrero", hints: ["Harina", "Piedra", "Viento"] }
+    ],
+    "Instrumentos de Cuerda": [
+        { civ: "Ukelele", imp: "Guitarra", hints: ["Música", "Cuerdas", "Pequeño"] },
+        { civ: "Violín", imp: "Violonchelo", hints: ["Arco", "Cuerda", "Clásico"] },
+        { civ: "Arpa", imp: "Lira", hints: ["Dedos", "Cuerdas", "Ángel"] },
+        { civ: "Bajo", imp: "Contrabajo", hints: ["Grave", "Cuerda", "Ritmo"] },
+        { civ: "Banjo", imp: "Mandolina", hints: ["Folclore", "Cuerda", "Metal"] }
+    ],
+    "Deportes de Raqueta": [
+        { civ: "Pádel", imp: "Tenis", hints: ["Red", "Pelota", "Pala"] },
+        { civ: "Ping-Pong", imp: "Bádminton", hints: ["Mesa", "Red", "Raqueta"] },
+        { civ: "Squash", imp: "Frontón", hints: ["Pared", "Raqueta", "Rápido"] },
+        { civ: "Pickleball", imp: "Tenis Playa", hints: ["Red", "Arena", "Deporte"] },
+        { civ: "Pelota Vasca", imp: "Jai Alai", hints: ["Cesta", "Mano", "Frontón"] }
+    ],
+    "Moda (Inditex)": [
+        { civ: "Zara", imp: "Pull&Bear", hints: ["Ropa", "Tienda", "España"] },
+        { civ: "Stradivarius", imp: "Bershka", hints: ["Chica", "Tienda", "Moda"] },
+        { civ: "Massimo Dutti", imp: "Oysho", hints: ["Elegante", "Ropa", "Inditex"] },
+        { civ: "Lefties", imp: "Primark", hints: ["Barato", "Ropa", "Tienda"] },
+        { civ: "H&M", imp: "Mango", hints: ["Moda", "Tienda", "Ropa"] }
+    ],
+    "Zodiaco": [
+        { civ: "Escorpio", imp: "Piscis", hints: ["Signo", "Estrellas", "Destino"] },
+        { civ: "Leo", imp: "Aries", hints: ["Fuego", "Animal", "Horóscopo"] },
+        { civ: "Géminis", imp: "Libra", hints: ["Aire", "Signo", "Dualidad"] },
+        { civ: "Tauro", imp: "Capricornio", hints: ["Tierra", "Cuernos", "Signo"] },
+        { civ: "Sagitario", imp: "Acuario", hints: ["Arco", "Estrellas", "Futuro"] }
+    ],
+    "Mitología Griega": [
+        { civ: "Zeus", imp: "Odín", hints: ["Dios", "Rayo", "Poder"] },
+        { civ: "Hércules", imp: "Aquiles", hints: ["Héroe", "Fuerza", "Leyenda"] },
+        { civ: "Poseidón", imp: "Hades", hints: ["Dios", "Tridente", "Mar"] },
+        { civ: "Atenea", imp: "Afrodita", hints: ["Diosa", "Sabiduría", "Mujer"] },
+        { civ: "Minotauro", imp: "Medusa", hints: ["Monstruo", "Laberinto", "Mitología"] }
+    ],
+    "Emociones Complejas": [
+        { civ: "Nostalgia", imp: "Melancolía", hints: ["Sentimiento", "Pasado", "Tristeza"] },
+        { civ: "Euforia", imp: "Éxtasis", hints: ["Alegría", "Intenso", "Cuerpo"] },
+        { civ: "Rencor", imp: "Envidia", hints: ["Malo", "Corazón", "Persona"] },
+        { civ: "Alivio", imp: "Paz", hints: ["Calma", "Final", "Mente"] },
+        { civ: "Ansiedad", imp: "Estrés", hints: ["Nervios", "Mente", "Prisa"] }
+    ],
+    "Filosofía": [
+        { civ: "Platón", imp: "Aristóteles", hints: ["Pensador", "Grecia", "Libro"] },
+        { civ: "Sócrates", imp: "Descartes", hints: ["Mente", "Filosofía", "Pregunta"] },
+        { civ: "Nietzsche", imp: "Marx", hints: ["Alemán", "Idea", "Política"] },
+        { civ: "Epicuro", imp: "Séneca", hints: ["Vida", "Felicidad", "Grecia"] },
+        { civ: "Existencialismo", imp: "Nihilismo", hints: ["Nada", "Vida", "Sentido"] }
+    ],
+    "Electrodomésticos Pequeños": [
+        { civ: "Tostadora", imp: "Sandwichera", hints: ["Cocina", "Calor", "Pan"] },
+        { civ: "Batidora", imp: "Exprimidor", hints: ["Zumo", "Motor", "Vaso"] },
+        { civ: "Cafetera", imp: "Tetera", hints: ["Desayuno", "Agua", "Taza"] },
+        { civ: "Freidora", imp: "Airfryer", hints: ["Aceite", "Comida", "Frito"] },
+        { civ: "Microondas", imp: "Horno", hints: ["Caliente", "Hogar", "Rápido"] }
+    ],
+    "Papelería y Oficina": [
+        { civ: "Grapadora", imp: "Clips", hints: ["Mesa", "Papel", "Unión"] },
+        { civ: "Agenda", imp: "Calendario", hints: ["Fecha", "Papel", "Día"] },
+        { civ: "Rotulador", imp: "Subrayador", hints: ["Color", "Escribir", "Tinta"] },
+        { civ: "Folio", imp: "Libreta", hints: ["Papel", "Blanco", "Escribir"] },
+        { civ: "Tijeras", imp: "Pegamento", hints: ["Cortar", "Manualidad", "Mesa"] }
+    ],
+    "Transporte de Lujo": [
+        { civ: "Yate", imp: "Crucero", hints: ["Mar", "Dinero", "Barco"] },
+        { civ: "Jet Privado", imp: "Primera Clase", hints: ["Avión", "Viaje", "Rico"] },
+        { civ: "Limusina", imp: "Ferrari", hints: ["Coche", "Largo", "Lujo"] },
+        { civ: "Suite", imp: "Penthouse", hints: ["Hotel", "Cama", "Caro"] },
+        { civ: "Helicóptero", imp: "Globo", hints: ["Volar", "Cielo", "Caro"] }
+    ],
+    "Juegos de Mesa Clásicos": [
+        { civ: "Parchís", imp: "La Oca", hints: ["Dados", "Tablero", "Fichas"] },
+        { civ: "Monopoly", imp: "Catan", hints: ["Dinero", "Casas", "Jugar"] },
+        { civ: "Scrabble", imp: "Trivial", hints: ["Letras", "Palabras", "Mesa"] },
+        { civ: "Ajedrez", imp: "Damas", hints: ["Fichas", "Estrategia", "Blanco y Negro"] },
+        { civ: "Dominó", imp: "Cartas", hints: ["Mano", "Mesa", "Tradición"] }
+    ],
+    "Vida Nocturna": [
+        { civ: "Discoteca", imp: "Pub", hints: ["Fiesta", "Noche", "Bebida"] },
+        { civ: "Festival", imp: "Concierto", hints: ["Música", "Gente", "Entrada"] },
+        { civ: "Bar de Copas", imp: "Chiringuito", hints: ["Beber", "Música", "Amigos"] },
+        { civ: "Karaoke", imp: "Bingo", hints: ["Cantar", "Micro", "Noche"] },
+        { civ: "After", imp: "Chill out", hints: ["Noche", "Música", "Final"] }
     ]
 };

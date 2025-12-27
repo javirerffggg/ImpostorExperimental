@@ -208,7 +208,7 @@ const ResultsView: React.FC<{
                 {/* Architect Badge */}
                 {architect && !isTroll && (
                     <div 
-                        className="mt-3 inline-flex items-center gap-2 px-3 py-1 rounded-full border backdrop-blur-sm"
+                        className="mt-3 inline-flex items-center gap-2 px-3 py-1 rounded-full border backdrop-blur-md"
                         style={{ 
                             borderColor: '#eab308', 
                             backgroundColor: 'rgba(234, 179, 8, 0.1)'
@@ -1268,7 +1268,7 @@ function App() {
                             )}
                         </div>
 
-                        <div className="grid grid-cols-1 gap-3 pb-32">
+                        <div className="grid grid-cols-3 gap-2 pb-32">
                             {allCats.map(cat => {
                                 const isActive = selected.includes(cat);
                                 return (
@@ -1281,10 +1281,12 @@ function App() {
                                             color: isActive ? '#fff' : theme.text,
                                             boxShadow: isActive ? `0 4px 12px ${theme.accent}40` : 'none'
                                         }}
-                                        className="p-4 rounded-xl border font-bold text-left flex justify-between items-center transition-all active:scale-95 backdrop-blur-sm transform-gpu"
+                                        className="p-2 h-24 rounded-lg border font-bold flex flex-col items-center justify-center text-center transition-all active:scale-95 backdrop-blur-sm transform-gpu"
                                     >
-                                        <span className="opacity-90 text-sm uppercase tracking-wide">{cat}</span>
-                                        {isActive && <Check size={18} strokeWidth={3} />}
+                                        {isActive && <Check size={14} strokeWidth={4} className="mb-1" />}
+                                        <span className="opacity-90 text-[10px] uppercase tracking-wide leading-tight">
+                                            {cat}
+                                        </span>
                                     </button>
                                 );
                             })}
