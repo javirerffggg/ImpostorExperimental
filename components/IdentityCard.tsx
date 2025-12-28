@@ -158,11 +158,14 @@ export const IdentityCard: React.FC<Props> = ({ player, theme, color, onRevealSt
 
     const getFontSize = (text: string) => {
         const len = text.length;
+        // Even more conservative scaling to prevent clipping
+        if (len > 35) return '0.9rem'; 
         if (len > 25) return '1.1rem'; 
-        if (len > 16) return '1.4rem';
-        if (len > 10) return '1.8rem';
-        if (len > 6) return '2.4rem';  
-        return '3.2rem';
+        if (len > 18) return '1.3rem';
+        if (len > 12) return '1.5rem';
+        if (len > 8)  return '1.9rem'; 
+        if (len > 5)  return '2.4rem'; 
+        return '3.0rem';               
     };
 
     const isButtonVisible = readyForNext && !isHolding && !isDragging && dragPosition.y === 0;
@@ -380,11 +383,12 @@ export const IdentityCard: React.FC<Props> = ({ player, theme, color, onRevealSt
                                 </div>
 
                                 {/* MIDDLE SECTION: Word (Flexible, centers in available space) */}
-                                {/* Added mb-auto to ensure it pushes away from the bottom "finger zone" */}
-                                <div className="flex-1 flex items-center justify-center w-full px-4 overflow-visible my-auto mb-12">
+                                {/* Reduced bottom margin to 8 to give more space */}
+                                <div className="flex-1 flex items-center justify-center w-full px-4 overflow-visible my-auto mb-8">
                                     <p 
                                         style={{ 
                                             fontSize: getFontSize(player.word),
+                                            lineHeight: '1.15',
                                             // Gradient Typography Effect
                                             background: player.isImp 
                                                 ? 'linear-gradient(180deg, #ffffff 0%, #ff3333 40%, #500000 100%)' // Impostor: White -> Bright Red -> Blood Red
@@ -394,11 +398,14 @@ export const IdentityCard: React.FC<Props> = ({ player, theme, color, onRevealSt
                                             backgroundClip: 'text',
                                             
                                             maxHeight: '100%',
+                                            width: '100%',
+                                            maxWidth: '100%',
                                             display: '-webkit-box',
-                                            WebkitLineClamp: 4, 
+                                            WebkitLineClamp: 5, 
                                             WebkitBoxOrient: 'vertical',
                                             overflow: 'hidden',
                                             wordBreak: 'break-word',
+                                            overflowWrap: 'anywhere',
                                             hyphens: 'auto'
                                         }}
                                         className={`font-black leading-tight text-center uppercase ${player.isImp ? 'glitch-text-anim' : ''}`}
