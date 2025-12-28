@@ -1,6 +1,6 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { GamePlayer, ThemeConfig } from '../types';
-import { Fingerprint, Shield, Skull, Eye, Play, ArrowRight } from 'lucide-react';
+import { Fingerprint, Shield, Skull, Eye, Play, ArrowRight, Lock } from 'lucide-react';
 
 interface Props {
     player: GamePlayer;
@@ -122,7 +122,8 @@ export const IdentityCard: React.FC<Props> = ({ player, theme, color, onRevealSt
             setIsDragging(true);
         }
 
-        const resistance = 0.6; 
+        // ERGONOMICS v2.0: Higher resistance for stability (Was 0.6)
+        const resistance = 0.4; 
         setDragPosition({
             x: deltaX * resistance,
             y: deltaY * resistance
@@ -168,7 +169,7 @@ export const IdentityCard: React.FC<Props> = ({ player, theme, color, onRevealSt
         <div className="flex flex-col items-center gap-8 w-full max-w-sm z-10 relative">
             {/* Header: Compacts when holding to avoid overlap */}
             <div 
-                className={`text-center space-y-1 transition-all duration-300 ease-out origin-center ${isHolding ? 'scale-75 opacity-50 -translate-y-6' : 'scale-100 opacity-100 translate-y-0'}`}
+                className={`text-center space-y-1 transition-all duration-300 ease-out origin-center ${isHolding ? 'scale-90 opacity-80 -translate-y-2' : 'scale-100 opacity-100 translate-y-0'}`}
             >
                 <p style={{ color: theme.sub }} className="text-xs font-black uppercase tracking-[0.3em]">Identidad</p>
                 <h2 style={{ color: color, fontFamily: theme.font }} className="text-4xl font-bold">{player.name}</h2>
@@ -191,7 +192,7 @@ export const IdentityCard: React.FC<Props> = ({ player, theme, color, onRevealSt
                         top: '-20%',
                         left: '-20%',
                         background: `radial-gradient(circle, ${color}40 0%, ${color}00 70%)`,
-                        transform: `translate3d(${dragPosition.x}px, ${dragPosition.y + (isHolding ? -40 : 0)}px, 0) rotate(${dragPosition.x * 0.05}deg)`,
+                        transform: `translate3d(${dragPosition.x}px, ${dragPosition.y + (isHolding ? -20 : 0)}px, 0) rotate(${dragPosition.x * 0.05}deg)`,
                         transition: isDragging 
                             ? 'none' 
                             : 'transform 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
@@ -215,8 +216,10 @@ export const IdentityCard: React.FC<Props> = ({ player, theme, color, onRevealSt
                         
                         background: `linear-gradient(135deg, ${theme.cardBg} 0%, ${color}20 100%)`,
                         
-                        // FIX 1: Border is strictly transparent when idle to eliminate "gray bar" artifact
-                        borderColor: isHolding ? color : 'transparent', 
+                        // FIX: Remove border width completely when idle to prevent "gray bar" backdrop artifact
+                        borderWidth: isHolding ? '1px' : '0px',
+                        borderColor: color,
+                        
                         borderRadius: theme.radius,
                         
                         // Enhanced shadow in idle state to compensate for missing border
@@ -228,9 +231,10 @@ export const IdentityCard: React.FC<Props> = ({ player, theme, color, onRevealSt
                         
                         transition: isDragging 
                             ? 'none' 
-                            : 'transform 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.3s ease, border-color 0.3s ease',
+                            : 'transform 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.3s ease, border-width 0.1s ease',
                         
-                        transform: `translate3d(${dragPosition.x}px, ${dragPosition.y + (isHolding ? -40 : 0)}px, 0) rotate(${dragPosition.x * 0.05}deg)`,
+                        // ERGONOMICS v2.0: Reduced rotation for better reading stability
+                        transform: `translate3d(${dragPosition.x}px, ${dragPosition.y + (isHolding ? -20 : 0)}px, 0) rotate(${dragPosition.x * 0.03}deg)`,
                         
                         animation: (isHolding && !player.isImp) ? 'reveal-pulse 2s infinite' : 'none',
                         touchAction: 'none',
@@ -267,26 +271,59 @@ export const IdentityCard: React.FC<Props> = ({ player, theme, color, onRevealSt
                         />
                     )}
 
-                    {/* MAIN CONTENT CONTAINER - FIX 2: Layout Structure to prevent clipping */}
-                    <div className={`absolute inset-0 z-10 flex flex-col transition-all duration-200 ${isHolding ? 'justify-between py-6' : 'justify-center p-6'}`}>
+                    {/* MAIN CONTENT CONTAINER - ERGONOMICS v2.0: Dynamic Layout Strategy */}
+                    {/* If Idle: Content spreads (justify-between) for Top Text, Middle Lock, Bottom Finger. */}
+                    {/* If Holding: Content pushes to top (justify-start) with massive bottom padding to reserve finger space. */}
+                    <div className={`absolute inset-0 z-10 flex flex-col ${isHolding ? 'justify-start pt-6 pb-24' : 'justify-between py-8'} px-6 transition-none`}>
                         
                         {!isHolding ? (
-                            <div className="flex flex-col items-center gap-6 animate-pulse mt-auto mb-auto">
-                                <div 
-                                    className="w-24 h-24 rounded-full border-4 flex items-center justify-center transition-colors duration-300"
-                                    style={{ borderColor: color }}
-                                >
-                                    <Fingerprint size={48} color={color} />
+                            <>
+                                {/* TOP: CLASSIFIED HEADER */}
+                                <div className="w-full text-center mt-2 animate-in fade-in slide-in-from-top-4 duration-700">
+                                    <h3 
+                                        className="text-[10px] font-black uppercase tracking-[0.3em] opacity-90"
+                                        style={{ 
+                                            backgroundImage: `linear-gradient(to right, ${theme.sub} 20%, #ffffff 50%, ${theme.sub} 80%)`,
+                                            backgroundSize: '200% auto',
+                                            WebkitBackgroundClip: 'text',
+                                            WebkitTextFillColor: 'transparent',
+                                            animation: 'text-shimmer 3s linear infinite'
+                                        }}
+                                    >
+                                        IDENTIDAD CLASIFICADA
+                                    </h3>
                                 </div>
-                                <p style={{ color: theme.sub }} className="text-xs font-black tracking-widest uppercase">
-                                    Mantén pulsado para revelar
-                                </p>
-                            </div>
+
+                                {/* MIDDLE: LOCK ICON */}
+                                <div className="flex-1 flex items-center justify-center opacity-30 animate-pulse duration-1000">
+                                    <div className="relative">
+                                        <div className="absolute inset-0 bg-white/10 blur-2xl rounded-full transform scale-150" />
+                                        <Lock 
+                                            size={48} 
+                                            strokeWidth={1.5}
+                                            style={{ color: theme.text }} 
+                                        />
+                                    </div>
+                                </div>
+
+                                {/* BOTTOM: FINGERPRINT */}
+                                <div className="flex flex-col items-center gap-4 animate-pulse mb-4">
+                                    <div 
+                                        className="w-20 h-20 rounded-full border-2 flex items-center justify-center transition-colors duration-300 backdrop-blur-sm bg-black/10"
+                                        style={{ borderColor: `${color}60` }}
+                                    >
+                                        <Fingerprint size={40} color={color} className="opacity-80" />
+                                    </div>
+                                    <p style={{ color: theme.sub }} className="text-[9px] font-black tracking-widest uppercase opacity-70">
+                                        Mantener pulsado
+                                    </p>
+                                </div>
+                            </>
                         ) : (
-                            <div className="flex flex-col items-center justify-between w-full h-full animate-in fade-in duration-200">
+                            <div className="flex flex-col items-center h-full animate-in fade-in duration-200">
                                 
                                 {/* TOP SECTION: Role & Icon (Fixed Height / No Shrink) */}
-                                <div className="flex-none flex flex-col items-center justify-center gap-2 w-full pt-1">
+                                <div className="flex-none flex flex-col items-center justify-center gap-2 w-full pt-2">
                                     {player.isImp ? (
                                         <div className="relative flex items-center justify-center mb-1">
                                             {/* Aura Effects Impostor - Glitched */}
@@ -340,8 +377,9 @@ export const IdentityCard: React.FC<Props> = ({ player, theme, color, onRevealSt
                                     <div className={`w-2/3 h-px my-2 ${player.isImp ? 'bg-red-500/50 animate-pulse' : 'bg-white/20'}`} />
                                 </div>
 
-                                {/* MIDDLE SECTION: Word (Flexible, centers in available space, handles overflow) */}
-                                <div className="flex-1 flex items-center justify-center w-full px-2 overflow-hidden my-auto">
+                                {/* MIDDLE SECTION: Word (Flexible, centers in available space) */}
+                                {/* Added mb-auto to ensure it pushes away from the bottom "finger zone" */}
+                                <div className="flex-1 flex items-center justify-center w-full px-2 overflow-hidden my-auto mb-12">
                                     <p 
                                         style={{ 
                                             fontSize: getFontSize(player.word),
@@ -366,10 +404,11 @@ export const IdentityCard: React.FC<Props> = ({ player, theme, color, onRevealSt
                                     </p>
                                 </div>
 
-                                {/* BOTTOM SECTION: Footer Hint (Fixed) */}
-                                <div className="flex-none mt-auto pb-1">
-                                    <p style={{ color: theme.sub }} className="text-[10px] uppercase tracking-widest opacity-60">
-                                        Soltar para ocultar
+                                {/* BOTTOM SECTION: Visual hint for finger position (Optional, keep subtle) */}
+                                {/* Since we add padding-bottom to container, this text sits above the finger zone */}
+                                <div className="flex-none opacity-30">
+                                     <p style={{ color: theme.sub }} className="text-[9px] uppercase tracking-widest text-center">
+                                        Soltar
                                     </p>
                                 </div>
                             </div>
@@ -378,7 +417,7 @@ export const IdentityCard: React.FC<Props> = ({ player, theme, color, onRevealSt
                     
                     {/* CENTINELA PROTOCOL: Debug Overlay */}
                     {debugMode && (
-                        <div className="absolute bottom-1 left-1 z-50 p-1 pointer-events-none opacity-80 bg-black/50 backdrop-blur-sm rounded border border-amber-500/50">
+                        <div className="absolute top-1 left-1 z-50 p-1 pointer-events-none opacity-80 bg-black/50 backdrop-blur-sm rounded border border-amber-500/50">
                             <p className="text-[8px] font-mono text-amber-500 leading-tight">
                                 ID: {player.role.slice(0,3).toUpperCase()}<br/>
                                 W: {player.realWord.slice(0,6)}...<br/>
@@ -456,6 +495,10 @@ export const IdentityCard: React.FC<Props> = ({ player, theme, color, onRevealSt
                 @keyframes metallic-shine {
                     0% { background-position: 200% 0; }
                     100% { background-position: -200% 0; }
+                }
+                @keyframes text-shimmer {
+                    0% { background-position: 200% center; }
+                    100% { background-position: -200% center; }
                 }
                 @keyframes imp-aura-spin {
                     from { transform: rotate(0deg); }
