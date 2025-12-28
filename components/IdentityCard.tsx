@@ -157,10 +157,12 @@ export const IdentityCard: React.FC<Props> = ({ player, theme, color, onRevealSt
     };
 
     const getFontSize = (text: string) => {
-        if (text.length > 20) return '1.2rem'; // Extra small for very long text
-        if (text.length > 15) return '1.5rem';
-        if (text.length > 10) return '2.2rem';
-        return '3rem';
+        const len = text.length;
+        if (len > 25) return '1.1rem'; 
+        if (len > 16) return '1.4rem';
+        if (len > 10) return '1.8rem';
+        if (len > 6) return '2.4rem';  
+        return '3.2rem';
     };
 
     const isButtonVisible = readyForNext && !isHolding && !isDragging && dragPosition.y === 0;
@@ -379,7 +381,7 @@ export const IdentityCard: React.FC<Props> = ({ player, theme, color, onRevealSt
 
                                 {/* MIDDLE SECTION: Word (Flexible, centers in available space) */}
                                 {/* Added mb-auto to ensure it pushes away from the bottom "finger zone" */}
-                                <div className="flex-1 flex items-center justify-center w-full px-2 overflow-hidden my-auto mb-12">
+                                <div className="flex-1 flex items-center justify-center w-full px-4 overflow-visible my-auto mb-12">
                                     <p 
                                         style={{ 
                                             fontSize: getFontSize(player.word),
@@ -395,9 +397,11 @@ export const IdentityCard: React.FC<Props> = ({ player, theme, color, onRevealSt
                                             display: '-webkit-box',
                                             WebkitLineClamp: 4, 
                                             WebkitBoxOrient: 'vertical',
-                                            overflow: 'hidden'
+                                            overflow: 'hidden',
+                                            wordBreak: 'break-word',
+                                            hyphens: 'auto'
                                         }}
-                                        className={`font-black leading-tight text-center break-words uppercase ${player.isImp ? 'glitch-text-anim' : ''}`}
+                                        className={`font-black leading-tight text-center uppercase ${player.isImp ? 'glitch-text-anim' : ''}`}
                                         data-text={player.word}
                                     >
                                         {player.word}

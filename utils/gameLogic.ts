@@ -126,8 +126,10 @@ export const calculateInfinitumWeight = (
 ): number => {
     
     // Z. Quarantine Check (Marcador de Agente)
+    // CRITICAL: If quarantined, return extremely low weight to prevent selection in normal modes
+    // but not 0 to avoid division errors in ratios.
     if (vault.metrics.quarantineRounds > 0) {
-        return 0.01; // Ghost weight, practically zero but mathematically existent
+        return 0.01; 
     }
 
     // A. Motor de Frecuencia y Karma (V_fk) + Atenuación
@@ -378,8 +380,7 @@ export const generateGameData = (config: GameConfig): {
     const availableCategories = selectedCats.length > 0 ? selectedCats : Object.keys(CATEGORIES_DATA);
 
     // --- PROTOCOLO PANDORA & DEBUG ---
-    const roundsSinceLastTroll = currentRound - history.lastTrollRound;
-    const isCooldownActive = history.lastTrollRound > 0 && roundsSinceLastTroll <= 5;
+    // Calculate simple troll stats if needed
     
     let isTrollEvent = false;
     let trollScenario: TrollScenario | null = null;
@@ -395,10 +396,19 @@ export const generateGameData = (config: GameConfig): {
     const pastImpostorIds = history.pastImpostorIds || [];
     const paranoiaLevel = calculateParanoiaScore(pastImpostorIds, players, currentRound);
     
+    // 3. Post-Crisis Stabilization
+    // If coolingDownRounds > 0, we are recovering from a break protocol.
+    // Factor: 3->0.25, 2->0.50, 1->0.75, 0->1.0
+    let coolingRounds = history.coolingDownRounds || 0;
+    const coolingFactor = coolingRounds > 0 ? (1 - (coolingRounds * 0.25)) : 1.0;
+
     // 2. Determine if Break Protocol is needed (Red Level: > 70%)
     let breakProtocolType: 'pandora' | 'mirror' | 'blind' | null = null;
     
-    if (!isTrollEvent && paranoiaLevel > 70) {
+    // CRITICAL FIX: Ensure we do NOT trigger a new Break Protocol if we are actively cooling down.
+    // This prevents the "Mirror Loop" bug where quarantined players (low weight) get inverted 
+    // to high weight immediately after serving a sentence.
+    if (!isTrollEvent && paranoiaLevel > 70 && coolingRounds === 0) {
         const roll = Math.random() * 100;
         if (useTrollMode && roll < 50) {
             breakProtocolType = 'pandora';
@@ -409,12 +419,6 @@ export const generateGameData = (config: GameConfig): {
             breakProtocolType = 'blind';
         }
     }
-
-    // 3. Post-Crisis Stabilization
-    // If coolingDownRounds > 0, we are recovering from a break protocol.
-    // Factor: 3->0.25, 2->0.50, 1->0.75, 0->1.0
-    let coolingRounds = history.coolingDownRounds || 0;
-    const coolingFactor = coolingRounds > 0 ? (1 - (coolingRounds * 0.25)) : 1.0;
 
     // --- TROLL EVENT EXECUTION ---
     if (isTrollEvent) {
@@ -456,6 +460,49 @@ export const generateGameData = (config: GameConfig): {
         const vocalisStarter = runVocalisProtocol(players, history, false);
         const newStartingPlayers = [vocalisStarter.id, ...history.lastStartingPlayers].slice(0, 10);
 
+        // FIX: Update Vaults for Troll Events too, especially to apply Quarantine/Reset Streaks
+        const trollStats = { ...history.playerStats };
+        const trollNewPastImpostorIds = [...pastImpostorIds];
+
+        trollPlayers.forEach(p => {
+            const key = p.name.trim().toLowerCase();
+            const originalVault = getVault(key, trollStats);
+            const vault: InfinityVault = JSON.parse(JSON.stringify(originalVault));
+
+            vault.metrics.totalSessions += 1;
+            
+            // Decrement existing quarantine
+            if (vault.metrics.quarantineRounds > 0) {
+                vault.metrics.quarantineRounds -= 1;
+            }
+
+            if (p.isImp) {
+                vault.metrics.civilStreak = 0;
+                // Add to history
+                trollNewPastImpostorIds.unshift(p.id);
+
+                // For ANY troll event (chaos mode), we should quarantine the "Impostors" 
+                // to ensure a lottery reset in the next cooling rounds.
+                // In "Espejo Total", everyone gets quarantined -> Pure Lottery next round.
+                vault.metrics.quarantineRounds = 3; 
+
+            } else {
+                 // Only increase streak if not in quarantine
+                 if (vault.metrics.quarantineRounds === 0) {
+                    vault.metrics.civilStreak += 1;
+                }
+            }
+            
+            // Update other metrics roughly
+            const currentImpCount = (vault.metrics.impostorRatio * (vault.metrics.totalSessions - 1)) + (p.isImp ? 1 : 0);
+            vault.metrics.impostorRatio = currentImpCount / vault.metrics.totalSessions;
+
+            trollStats[key] = vault;
+        });
+        
+        // Truncate ID history
+        if (trollNewPastImpostorIds.length > 20) trollNewPastImpostorIds.length = 20;
+
         // RESET Paranoia after a crash/troll event
         return { 
             players: trollPlayers, isTrollEvent: true, trollScenario: trollScenario, isArchitectTriggered: false, designatedStarter: vocalisStarter.name,
@@ -464,6 +511,8 @@ export const generateGameData = (config: GameConfig): {
                 roundCounter: currentRound, 
                 lastTrollRound: currentRound, 
                 lastStartingPlayers: newStartingPlayers,
+                playerStats: trollStats, // UPDATE STATS
+                pastImpostorIds: trollNewPastImpostorIds, // UPDATE IDS
                 paranoiaLevel: 0, // Reset
                 coolingDownRounds: 3, // Start cooling
                 lastBreakProtocol: breakProtocolType || 'manual'
@@ -522,7 +571,9 @@ export const generateGameData = (config: GameConfig): {
         // Invert weights: heaviest becomes lightest
         // Simple way: sort ascending instead of weighted random
         playerWeights.sort((a, b) => a.weight - b.weight); 
-        // Force the lowest weight to be super high just for selection
+        // Force the lowest weight (likely a quarantined player) to be super high just for selection
+        // This causes the Quarantined player to be picked IF mirror is active.
+        // The fix above (checking coolingRounds) ensures this block doesn't run during quarantine.
         playerWeights[0].weight = 999999; 
     }
 
