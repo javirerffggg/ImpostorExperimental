@@ -1,3 +1,4 @@
+
 import { CATEGORIES_DATA } from '../categories';
 import { GamePlayer, Player, InfinityVault, TrollScenario, CategoryData } from '../types';
 
@@ -17,8 +18,28 @@ interface GameConfig {
         lastTrollRound: number;
         lastArchitectRound: number;
         lastStartingPlayers: string[];
+        
+        // v6.1
+        pastImpostorIds?: string[];
+        paranoiaLevel?: number;
+        coolingDownRounds?: number;
+        lastBreakProtocol?: string | null;
     };
+    debugOverrides?: {
+        forceTroll: TrollScenario | null;
+        forceArchitect: boolean;
+    }
 }
+
+// --- HELPER: Fisher-Yates Shuffle ---
+const shuffleArray = <T>(array: T[]): T[] => {
+    const arr = [...array];
+    for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
+};
 
 // --- INFINITUM HELPERS ---
 
@@ -28,7 +49,8 @@ const createNewVault = (uid: string): InfinityVault => ({
         totalSessions: 0,
         impostorRatio: 0,
         civilStreak: 0,
-        totalImpostorWins: 0
+        totalImpostorWins: 0,
+        quarantineRounds: 0 // v6.1
     },
     categoryDNA: {},
     sequenceAnalytics: {
@@ -50,26 +72,81 @@ const calculateNewbieBuffer = (weights: number[]): number => {
     return sorted[index];
 };
 
-// 4. La Ecuación Maestra de INFINITUM
-const calculateInfinitumWeight = (
+// --- FACTOR PARANOIA: PATTERN DETECTION (v2.0) ---
+const calculateParanoiaScore = (
+    pastImpostorIds: string[], 
+    currentPlayers: Player[],
+    currentRound: number
+): number => {
+    if (pastImpostorIds.length < 4) return 0; // Need data
+
+    // Map IDs to current indices to detect linear patterns
+    const idToIndex = new Map(currentPlayers.map((p, i) => [p.id, i]));
+    const lastN = pastImpostorIds.slice(0, 5); // Look at last 5
+    const indices = lastN.map(id => idToIndex.get(id)).filter(i => i !== undefined) as number[];
+
+    if (indices.length < 3) return 0;
+
+    let score = 0;
+
+    // A. Detección de Secuencia Lineal (i_n = i_{n-1} + 1)
+    let sequentialHits = 0;
+    for (let i = 0; i < indices.length - 1; i++) {
+        const diff = (indices[i] - indices[i+1]); // Checking reverse chronological
+        if (Math.abs(diff) === 1 || Math.abs(diff) === currentPlayers.length - 1) {
+            sequentialHits++;
+        }
+    }
+    if (sequentialHits >= 2) score += 50; // High Alert
+    if (sequentialHits >= 3) score += 50; // Critical
+
+    // B. Detección de Sub-clanes (Repetición de parejas/personas)
+    const frequency: Record<string, number> = {};
+    lastN.forEach(id => { frequency[id] = (frequency[id] || 0) + 1; });
+    const maxFreq = Math.max(...Object.values(frequency));
+    
+    if (maxFreq >= 3) score += 60; // Same person 3 times in 5 games? Sus.
+    else if (maxFreq >= 2) score += 20;
+
+    // C. Entropía de Sesión (Aburrimiento)
+    // If round number is high and no anomaly detected, slowly creep paranoia up
+    if (currentRound > 8) score += (currentRound % 5) * 5;
+
+    return Math.min(100, score);
+};
+
+// 4. La Ecuación Maestra de INFINITUM (v6.1)
+export const calculateInfinitumWeight = (
     player: Player, 
     vault: InfinityVault, 
     category: string, 
-    currentRound: number
+    currentRound: number,
+    coolingDownFactor: number = 1.0, // 1.0 = Normal, 0.25 = Strong Cooling
+    averageWeightEstimate: number = 100 // For Noise Calculation
 ): number => {
-    // A. Motor de Frecuencia y Karma (V_fk)
+    
+    // Z. Quarantine Check (Marcador de Agente)
+    if (vault.metrics.quarantineRounds > 0) {
+        return 0.01; // Ghost weight, practically zero but mathematically existent
+    }
+
+    // A. Motor de Frecuencia y Karma (V_fk) + Atenuación
     const base = 100;
     const ratio = Math.max(vault.metrics.impostorRatio, 0.01); 
-    const v_fk = base * Math.log(vault.metrics.civilStreak + 2) * (1 / ratio);
-
-    // B. Motor de Recencia y Secuencia (V_rs)
-    let v_rs = 1.0;
-    const history = vault.sequenceAnalytics.roleSequence; 
     
-    if (history[0]) v_rs *= 0.0001; 
-    else if (history[1]) v_rs *= 0.05; 
-    else if (history[2]) v_rs *= 0.20; 
-    else if (history[3] || history[4]) v_rs *= 0.50; 
+    // v6.1: Attenuation during Cooling Phase
+    const effectiveStreak = vault.metrics.civilStreak * coolingDownFactor; 
+    
+    const v_fk = base * Math.log(effectiveStreak + 2) * (1 / ratio);
+
+    // B. Motor de Recencia y Secuencia (V_rs) - v6.1 SMOOTHED
+    let v_rs = 1.0;
+    const history = vault.sequenceAnalytics.roleSequence; // [Most Recent, ..., Oldest]
+    
+    if (history[0]) v_rs *= 0.05;      // Before: 0.0001 -> Now: 5% (Uncertainty Multiplier)
+    else if (history[1]) v_rs *= 0.30; // Before: 0.05 -> Now: 30%
+    else if (history[2]) v_rs *= 0.60; // Before: 0.20 -> Now: 60%
+    else if (history[3]) v_rs *= 1.0;  // Before: 0.50 -> Now: 100% (Clean Slate earlier)
 
     // C. Motor de Afinidad de Categoría (V_ac)
     let v_ac = 1.0;
@@ -78,10 +155,40 @@ const calculateInfinitumWeight = (
         v_ac *= 0.8; 
     }
 
-    // Entropy (Ruido Cuántico)
-    const entropy = Math.random() * 5;
+    // D. Ruido Cuántico (v6.1)
+    // Random float between 0 and 30% of average weight
+    const noise = Math.random() * (averageWeightEstimate * 0.3);
 
-    return (v_fk * v_rs * v_ac) + entropy;
+    return (v_fk * v_rs * v_ac) + noise;
+};
+
+// Helper for Debug Console
+export const getDebugPlayerStats = (
+    players: Player[], 
+    stats: Record<string, InfinityVault>, 
+    round: number
+): { name: string, weight: number, prob: number, streak: number }[] => {
+    const weights: number[] = [];
+    const dummyCat = "General"; 
+    
+    // First pass
+    const playerWeights = players.map(p => {
+        const key = p.name.trim().toLowerCase();
+        const vault = getVault(key, stats);
+        // Estimate avg weight as 100 for debug vis
+        const w = calculateInfinitumWeight(p, vault, dummyCat, round, 1.0, 100);
+        weights.push(w);
+        return { p, w, v: vault };
+    });
+
+    const totalW = weights.reduce((a, b) => a + b, 0);
+
+    return playerWeights.map(item => ({
+        name: item.p.name,
+        weight: Math.round(item.w),
+        prob: totalW > 0 ? (item.w / totalW) * 100 : 0,
+        streak: item.v.metrics.civilStreak
+    })).sort((a, b) => b.weight - a.weight);
 };
 
 // D. Motor de Sinergia de Escuadrón (V_se)
@@ -102,31 +209,21 @@ const calculateArchitectTrigger = (
     const roundsSinceLast = currentRound - (history.lastArchitectRound || -999);
     
     // A. Coeficiente de Recencia Vital (C_rv)
-    if (roundsSinceLast <= 1) return false; // Bloqueo inmediato
+    if (roundsSinceLast <= 1) return false; 
 
-    let baseProb = 0.15; // 15% Base
+    let baseProb = 0.15; 
 
     if (roundsSinceLast >= 2 && roundsSinceLast <= 5) {
-        baseProb = 0.05; // Fatiga reciente
+        baseProb = 0.05; 
     } else if (roundsSinceLast > 10) {
-        baseProb = 0.25; // Urgencia por sequía
+        baseProb = 0.25; 
     }
 
-    // C. Inyección de Entropía Ambiental (Sesiones Largas)
-    if (currentRound > 10) {
-        baseProb = Math.max(baseProb, 0.20); 
-    }
+    if (currentRound > 10) baseProb = Math.max(baseProb, 0.20); 
+    if (firstCivilStreak > 8) baseProb += 0.10; 
 
-    // B. Factor de Justicia del Civil (F_jc)
-    if (firstCivilStreak > 8) {
-        baseProb += 0.10; // +10% bonus
-    }
-
-    // C. Hora Bruja (00:00 - 03:00)
     const hour = new Date().getHours();
-    if (hour >= 0 && hour < 3) {
-        baseProb *= 2; // Doble probabilidad
-    }
+    if (hour >= 0 && hour < 3) baseProb *= 2; 
 
     return Math.random() < baseProb;
 };
@@ -138,8 +235,6 @@ interface LexiconSelection {
     wordPair: CategoryData;
 }
 
-// Exported for Architect Regeneration
-// Now returns TWO options for the user to choose from
 export const generateArchitectOptions = (selectedCats: string[]): [LexiconSelection, LexiconSelection] => {
     const allCategories = Object.keys(CATEGORIES_DATA);
     let pool = selectedCats.length > 0 ? selectedCats : allCategories;
@@ -155,7 +250,6 @@ export const generateArchitectOptions = (selectedCats: string[]): [LexiconSelect
     const option1 = getOption();
     let option2 = getOption();
 
-    // Simple check to ensure they aren't identical (low probability but possible)
     let attempts = 0;
     while (option1.wordPair.civ === option2.wordPair.civ && attempts < 10) {
         option2 = getOption();
@@ -172,47 +266,30 @@ const selectLexiconWord = (
     const allCategories = Object.keys(CATEGORIES_DATA);
     let activePoolCategories: string[] = [];
 
-    // 1. Determine Mode
     const isSingleMode = selectedCats.length === 1;
     const isOmniscientMode = selectedCats.length === 0 || selectedCats.length === allCategories.length;
-    // Hybrid mode is implied if neither above is true
 
     if (isSingleMode) {
-        // A. Specialization Mode: Use the single category
         activePoolCategories = selectedCats;
     } else if (isOmniscientMode) {
-        // C. Omniscient Mode: Use all, filter last 3 used categories
         activePoolCategories = allCategories.filter(cat => !history.lastCategories.includes(cat));
-        // Fallback if filter removes everything (edge case)
         if (activePoolCategories.length === 0) activePoolCategories = allCategories;
     } else {
-        // B. Hybrid Mode: Use selected categories
         activePoolCategories = selectedCats;
     }
 
-    // Branch Equity: Pick one category first to ensure equal probability per branch
     const chosenCategoryName = activePoolCategories[Math.floor(Math.random() * activePoolCategories.length)];
     const categoryWords = CATEGORIES_DATA[chosenCategoryName];
 
-    // 2. Historical Censorship Filter
-    // Filter out Session Exclusion words (last 15)
     const validWords = categoryWords.filter(w => !history.lastWords.includes(w.civ));
-    
-    // Fallback if strict filter removes all words
     const poolToWeight = validWords.length > 0 ? validWords : categoryWords;
 
-    // 3. Vital Penalty Calculation
-    // W_w = 1 - (times_used / total_global_games)
-    // We estimate total global games as sum of usages or just track a global counter. 
-    // Simplified: W = 1 / (usage + 1)
-    
     const weightedPool = poolToWeight.map(w => {
         const usage = history.globalWordUsage[w.civ] || 0;
         const weight = 1 / (usage + 1);
         return { word: w, weight };
     });
 
-    // Weighted Random Pick for Word
     const totalWeight = weightedPool.reduce((sum, item) => sum + item.weight, 0);
     let randomTicket = Math.random() * totalWeight;
     let selectedPair: CategoryData = weightedPool[0].word;
@@ -228,37 +305,28 @@ const selectLexiconWord = (
     return { categoryName: chosenCategoryName, wordPair: selectedPair };
 };
 
-// 4. Smart Hint Generator
 export const generateSmartHint = (pair: CategoryData): string => {
-    // Dynamic Mutation: Pick a random hint from the available array
-    // This prevents memorization of a static hint
     if (pair.hints && pair.hints.length > 0) {
         const randomIndex = Math.floor(Math.random() * pair.hints.length);
         return pair.hints[randomIndex];
     }
-    // Fallback for legacy data without array
     return pair.hint || "Sin Pista";
 };
 
 // --- PROTOCOLO VOCALIS (v1.0) ---
-// Motor de Secuenciación Oratoria
 const runVocalisProtocol = (
     players: Player[],
     history: GameConfig['history'],
     isParty: boolean,
     architectId?: string
 ): Player => {
-    // 1. Estrategia "Brindis de Inicio" (Modo Fiesta)
     if (isParty) {
-        // Jugador con el nombre más largo
         const sortedByLength = [...players].sort((a, b) => b.name.length - a.name.length);
-        // Si hay empate, coger uno random de los más largos
         const maxLength = sortedByLength[0].name.length;
         const candidates = sortedByLength.filter(p => p.name.length === maxLength);
         return candidates[Math.floor(Math.random() * candidates.length)];
     }
 
-    // 2. Filtrado de Arquitecto (90% probabilidad de NO empezar)
     let candidates = players;
     if (architectId && players.length > 2) {
         if (Math.random() < 0.9) {
@@ -266,30 +334,22 @@ const runVocalisProtocol = (
         }
     }
 
-    // 3. Cálculo de Pesos (Ecuación de Prioridad Oratoria)
     const weightedCandidates = candidates.map(p => {
         let weight = 100;
-
-        // A. Índice de Fatiga Oratoria (I_fo)
-        const lastStartRound = history.lastStartingPlayers.indexOf(p.id); // 0 es la última ronda
+        const lastStartRound = history.lastStartingPlayers.indexOf(p.id); 
         
-        if (lastStartRound === 0) weight *= 0.001; // Fue el último: bloqueo casi total
-        else if (lastStartRound === 1) weight *= 0.05; // Hace 2 rondas
+        if (lastStartRound === 0) weight *= 0.001; 
+        else if (lastStartRound === 1) weight *= 0.05; 
         else if (lastStartRound === 2) weight *= 0.25;
-        else if (lastStartRound === -1) weight *= 3.0; // Nunca ha empezado recientemente
+        else if (lastStartRound === -1) weight *= 3.0; 
 
-        // B. Entropía Nominal (Sesgo de Atributos)
         const nameEntropy = p.name.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-        // Pequeño bono basado en la entropía para romper empates estadísticos
         weight += (nameEntropy % 20); 
-
-        // Factor de Entropía Aleatoria (epsilon)
         weight *= (0.8 + Math.random() * 0.4); 
 
         return { player: p, weight };
     });
 
-    // 4. Selección Ponderada
     const totalWeight = weightedCandidates.reduce((sum, item) => sum + item.weight, 0);
     let ticket = Math.random() * totalWeight;
     
@@ -309,45 +369,65 @@ export const generateGameData = (config: GameConfig): {
     isTrollEvent: boolean;
     trollScenario: TrollScenario | null;
     isArchitectTriggered: boolean; 
-    designatedStarter: string; // VOCALIS Result
-    newHistory: { 
-        roundCounter: number;
-        lastWords: string[];
-        lastCategories: string[];
-        globalWordUsage: Record<string, number>;
-        playerStats: Record<string, InfinityVault>;
-        lastTrollRound: number;
-        lastArchitectRound: number;
-        lastStartingPlayers: string[];
-    } 
+    designatedStarter: string; 
+    newHistory: GameConfig['history'];
 } => {
-    const { players, impostorCount, useHintMode, useTrollMode, useArchitectMode, selectedCats, history } = config;
+    const { players, impostorCount, useHintMode, useTrollMode, useArchitectMode, selectedCats, history, debugOverrides } = config;
     
     const currentRound = history.roundCounter + 1;
     const availableCategories = selectedCats.length > 0 ? selectedCats : Object.keys(CATEGORIES_DATA);
 
-    // --- PROTOCOLO PANDORA (Troll Logic) ---
+    // --- PROTOCOLO PANDORA & DEBUG ---
     const roundsSinceLastTroll = currentRound - history.lastTrollRound;
     const isCooldownActive = history.lastTrollRound > 0 && roundsSinceLastTroll <= 5;
-    const isTrollEvent = !isCooldownActive && useTrollMode && Math.random() < 0.15;
-
-    // Determine starter purely randomly for Troll Event (Chaos)
-    // Or apply VOCALIS anyway? Let's apply VOCALIS to keep consistency unless specified.
-    // For now, let's calculate VOCALIS starter *before* returning data so it's consistent.
     
-    if (isTrollEvent) {
-        // TROLL LOGIC
+    let isTrollEvent = false;
+    let trollScenario: TrollScenario | null = null;
+
+    if (debugOverrides?.forceTroll) {
+        isTrollEvent = true;
+        trollScenario = debugOverrides.forceTroll;
+    }
+
+    // --- PARANOIA ENGINE v2.0 & DISTRIBUTIVE SINGULARITY ---
+    
+    // 1. Calculate Paranoia
+    const pastImpostorIds = history.pastImpostorIds || [];
+    const paranoiaLevel = calculateParanoiaScore(pastImpostorIds, players, currentRound);
+    
+    // 2. Determine if Break Protocol is needed (Red Level: > 70%)
+    let breakProtocolType: 'pandora' | 'mirror' | 'blind' | null = null;
+    
+    if (!isTrollEvent && paranoiaLevel > 70) {
         const roll = Math.random() * 100;
-        let scenario: TrollScenario;
-        if (roll < 70) scenario = 'espejo_total';
-        else if (roll < 90) scenario = 'civil_solitario';
-        else scenario = 'falsa_alarma';
+        if (useTrollMode && roll < 50) {
+            breakProtocolType = 'pandora';
+            isTrollEvent = true;
+        } else if (roll < 80) { // 30% chance (or 80% if troll mode off)
+            breakProtocolType = 'mirror';
+        } else {
+            breakProtocolType = 'blind';
+        }
+    }
+
+    // 3. Post-Crisis Stabilization
+    // If coolingDownRounds > 0, we are recovering from a break protocol.
+    // Factor: 3->0.25, 2->0.50, 1->0.75, 0->1.0
+    let coolingRounds = history.coolingDownRounds || 0;
+    const coolingFactor = coolingRounds > 0 ? (1 - (coolingRounds * 0.25)) : 1.0;
+
+    // --- TROLL EVENT EXECUTION ---
+    if (isTrollEvent) {
+        if (!trollScenario) { 
+            const roll = Math.random() * 100;
+            if (roll < 70) trollScenario = 'espejo_total';
+            else if (roll < 90) trollScenario = 'civil_solitario';
+            else trollScenario = 'falsa_alarma';
+        }
 
         const catName = availableCategories[Math.floor(Math.random() * availableCategories.length)];
         const catDataList = CATEGORIES_DATA[catName];
         const basePair = catDataList[Math.floor(Math.random() * catDataList.length)];
-        
-        // Babylon Engine Noise Index
         const noiseIndex = Math.floor(Math.random() * players.length);
 
         const generateBabylonHint = (playerIndex: number): string => {
@@ -355,110 +435,100 @@ export const generateGameData = (config: GameConfig): {
             if (playerIndex === noiseIndex) {
                 const otherCats = Object.keys(CATEGORIES_DATA).filter(c => c !== catName);
                 const noiseCat = otherCats[Math.floor(Math.random() * otherCats.length)];
-                // Use new hint array logic for noise too
                 const noisePair = CATEGORIES_DATA[noiseCat][0];
                 const noiseHint = noisePair.hints ? noisePair.hints[0] : (noisePair.hint || "RUIDO");
                 return `PISTA: ${noiseHint} (RUIDO)`;
             }
-            // Use smart hint logic for troll scenarios too to maintain illusion
             const randomRelatedPair = catDataList[Math.floor(Math.random() * catDataList.length)];
             return Math.random() > 0.5 ? `PISTA: ${catName}` : `PISTA: ${generateSmartHint(randomRelatedPair)}`;
         };
 
-        // Construct Troll Players
         let trollPlayers: GamePlayer[] = [];
-        if (scenario === 'espejo_total') {
-            trollPlayers = players.map((p, idx) => ({
-                ...p, 
-                role: 'Impostor', 
-                word: generateBabylonHint(idx), 
-                realWord: basePair.civ, 
-                isImp: true, 
-                category: catName, 
-                areScore: 0,
-                impostorProbability: 100,
-                viewTime: 0
-            }));
-        } else if (scenario === 'civil_solitario') {
+        if (trollScenario === 'espejo_total') {
+            trollPlayers = players.map((p, idx) => ({ ...p, role: 'Impostor', word: generateBabylonHint(idx), realWord: basePair.civ, isImp: true, category: catName, areScore: 0, impostorProbability: 100, viewTime: 0 }));
+        } else if (trollScenario === 'civil_solitario') {
             const civilIndex = Math.floor(Math.random() * players.length);
-            trollPlayers = players.map((p, idx) => ({
-                ...p, 
-                role: idx === civilIndex ? 'Civil' : 'Impostor',
-                word: idx === civilIndex ? basePair.civ : generateBabylonHint(idx),
-                realWord: basePair.civ,
-                isImp: idx !== civilIndex,
-                category: catName, 
-                areScore: 0,
-                impostorProbability: idx === civilIndex ? 0 : 100,
-                viewTime: 0
-            }));
+            trollPlayers = players.map((p, idx) => ({ ...p, role: idx === civilIndex ? 'Civil' : 'Impostor', word: idx === civilIndex ? basePair.civ : generateBabylonHint(idx), realWord: basePair.civ, isImp: idx !== civilIndex, category: catName, areScore: 0, impostorProbability: idx === civilIndex ? 0 : 100, viewTime: 0 }));
         } else {
-            trollPlayers = players.map(p => ({
-                ...p, 
-                role: 'Civil', 
-                word: basePair.civ, 
-                realWord: basePair.civ, 
-                isImp: false, 
-                category: catName, 
-                areScore: 0,
-                impostorProbability: 0,
-                viewTime: 0
-            }));
+            trollPlayers = players.map(p => ({ ...p, role: 'Civil', word: basePair.civ, realWord: basePair.civ, isImp: false, category: catName, areScore: 0, impostorProbability: 0, viewTime: 0 }));
         }
 
-        // VOCALIS for Troll Mode (Just random or standard logic)
-        const vocalisStarter = runVocalisProtocol(players, history, false); // No party mode bias for trolls usually
+        const vocalisStarter = runVocalisProtocol(players, history, false);
         const newStartingPlayers = [vocalisStarter.id, ...history.lastStartingPlayers].slice(0, 10);
 
+        // RESET Paranoia after a crash/troll event
         return { 
-            players: trollPlayers, 
-            isTrollEvent: true, 
-            trollScenario: scenario,
-            isArchitectTriggered: false,
-            designatedStarter: vocalisStarter.name,
+            players: trollPlayers, isTrollEvent: true, trollScenario: trollScenario, isArchitectTriggered: false, designatedStarter: vocalisStarter.name,
             newHistory: { 
                 ...history, 
                 roundCounter: currentRound, 
-                lastTrollRound: currentRound,
-                lastStartingPlayers: newStartingPlayers
+                lastTrollRound: currentRound, 
+                lastStartingPlayers: newStartingPlayers,
+                paranoiaLevel: 0, // Reset
+                coolingDownRounds: 3, // Start cooling
+                lastBreakProtocol: breakProtocolType || 'manual'
             } 
         };
     }
 
-    // --- LEXICON & INFINITUM CORE LOGIC ---
+    // --- INFINITUM CORE LOGIC (Standard or Modified) ---
     
-    // 1. Select Word using Protocol LEXICON
     const { categoryName: catName, wordPair } = selectLexiconWord(selectedCats, history);
-
-    // 2. Prepare Vaults & Calculate Base Weights (Infinitum)
     const currentStats = { ...history.playerStats };
-    const playerWeights: { player: Player, weight: number, vault: InfinityVault }[] = [];
     
+    // Shuffle Pre-Pick (v6.1 Feature C)
+    const shuffledPlayers = shuffleArray(players);
+
+    // Prepare weights
+    const playerWeights: { player: Player, weight: number, vault: InfinityVault }[] = [];
     const existingWeights: number[] = [];
-    players.forEach(p => {
+    
+    // First, verify vaults exist and check newbies
+    shuffledPlayers.forEach(p => {
         const key = p.name.trim().toLowerCase();
-        if (currentStats[key]) {
-            const w = calculateInfinitumWeight(p, currentStats[key], catName, currentRound);
-            existingWeights.push(w);
-        }
+        if (currentStats[key]) existingWeights.push(currentStats[key].metrics.civilStreak); // rough usage
     });
+    const newbieWeight = 100; // Base value
 
-    const newbieWeight = calculateNewbieBuffer(existingWeights);
+    // Average Weight Calculation for Quantum Noise
+    let totalEstimatedWeight = 0;
+    shuffledPlayers.forEach(p => {
+        const key = p.name.trim().toLowerCase();
+        const vault = getVault(key, currentStats);
+        totalEstimatedWeight += calculateInfinitumWeight(p, vault, catName, currentRound, coolingFactor, 0); // No noise for estimation
+    });
+    const avgWeight = totalEstimatedWeight / (shuffledPlayers.length || 1);
 
-    players.forEach(p => {
+    // Calculate Final Weights
+    shuffledPlayers.forEach(p => {
         const key = p.name.trim().toLowerCase();
         let vault = getVault(key, currentStats);
-        let weight = (vault.metrics.totalSessions === 0) 
-            ? newbieWeight 
-            : calculateInfinitumWeight(p, vault, catName, currentRound);
+        let weight = 0;
+
+        if (breakProtocolType === 'blind') {
+            weight = 100; // Blind Lottery
+        } else {
+            // Standard Infinitum with v6.1 features
+            weight = (vault.metrics.totalSessions === 0) 
+                ? newbieWeight 
+                : calculateInfinitumWeight(p, vault, catName, currentRound, coolingFactor, avgWeight);
+        }
         
         playerWeights.push({ player: p, weight, vault });
     });
 
-    // CALCULATE PROBABILITY PERCENTAGES BEFORE MODIFICATION
+    // Mirror Inversion Logic
+    if (breakProtocolType === 'mirror') {
+        // Invert weights: heaviest becomes lightest
+        // Simple way: sort ascending instead of weighted random
+        playerWeights.sort((a, b) => a.weight - b.weight); 
+        // Force the lowest weight to be super high just for selection
+        playerWeights[0].weight = 999999; 
+    }
+
     const grandTotalWeight = playerWeights.reduce((sum, pw) => sum + pw.weight, 0);
 
-    // 3. Multi-Impostor Cascade Selection
+    // Cascade Selection
     const selectedImpostors: Player[] = [];
     const selectedKeys: string[] = []; 
 
@@ -491,8 +561,10 @@ export const generateGameData = (config: GameConfig): {
         selectedKeys.push(chosen.player.name.trim().toLowerCase());
     }
 
-    // 4. Update Infinity Vaults (Persistence)
+    // Update Vaults & Quarantine
     const newPlayerStats = { ...currentStats };
+    const newPastImpostorIds = [...pastImpostorIds];
+
     players.forEach(p => {
         const key = p.name.trim().toLowerCase();
         const originalVault = getVault(key, newPlayerStats);
@@ -500,11 +572,25 @@ export const generateGameData = (config: GameConfig): {
         const vault: InfinityVault = JSON.parse(JSON.stringify(originalVault));
 
         vault.metrics.totalSessions += 1;
+        
+        // Handle Quarantine Decrement
+        if (vault.metrics.quarantineRounds > 0) {
+            vault.metrics.quarantineRounds -= 1;
+        }
+
         if (isImp) {
             vault.metrics.civilStreak = 0;
-            vault.metrics.totalImpostorWins += 0; 
+            newPastImpostorIds.unshift(p.id); // Add to Paranoia History
+            
+            // Apply Quarantine if this was a Break Protocol selection
+            if (breakProtocolType) {
+                vault.metrics.quarantineRounds = 3; // Lock them out for cooldown duration
+            }
         } else {
-            vault.metrics.civilStreak += 1;
+            // Only increase streak if not in quarantine
+            if (vault.metrics.quarantineRounds === 0) {
+                vault.metrics.civilStreak += 1;
+            }
         }
 
         const currentImpostorCount = (vault.metrics.impostorRatio * (vault.metrics.totalSessions - 1)) + (isImp ? 1 : 0);
@@ -528,25 +614,30 @@ export const generateGameData = (config: GameConfig): {
         newPlayerStats[key] = vault;
     });
 
-    // 5. Update LEXICON History
     const newHistoryWords = [wordPair.civ, ...history.lastWords].slice(0, 15);
     const newHistoryCategories = [catName, ...history.lastCategories].slice(0, 3);
     const newGlobalWordUsage = { ...history.globalWordUsage };
     newGlobalWordUsage[wordPair.civ] = (newGlobalWordUsage[wordPair.civ] || 0) + 1;
 
-    // CHECK MDE v5.0 (Architect)
+    // Check Architect
     let isArchitectTriggered = false;
     let architectId: string | undefined;
 
-    if (useArchitectMode && players.length > 0) {
+    if (debugOverrides?.forceArchitect) {
+        if (players.length > 0) {
+            const firstPlayer = players[0];
+            const firstPlayerKey = firstPlayer.name.trim().toLowerCase();
+            if (!selectedKeys.includes(firstPlayerKey)) {
+                isArchitectTriggered = true;
+                architectId = firstPlayer.id;
+            }
+        }
+    } else if (useArchitectMode && players.length > 0) {
         const firstPlayer = players[0];
         const firstPlayerKey = firstPlayer.name.trim().toLowerCase();
-        
-        // STRICT RULE: Architect Mode only triggers if the FIRST player is a Civil.
         if (!selectedKeys.includes(firstPlayerKey)) {
             const vault = newPlayerStats[firstPlayerKey];
             const streak = vault?.metrics?.civilStreak || 0;
-            
             if (calculateArchitectTrigger(history, streak)) {
                 isArchitectTriggered = true;
                 architectId = firstPlayer.id;
@@ -554,25 +645,14 @@ export const generateGameData = (config: GameConfig): {
         }
     }
 
-    // --- VOCALIS EXECUTION ---
-    // If Architect is triggered, passing their ID to exclude them from starting with 90% probability
-    // Note: We check if `partyMode` is active from config passed in `selectLexiconWord` (it wasn't there before, assuming false for logic or need update).
-    // Actually, `generateGameData` config doesn't explicitly have `partyMode` boolean, but we can infer or add it.
-    // For now, passing `false` for party mode specific logic inside this function unless we update the interface, 
-    // but the weights will still work. Let's assume standard logic if not passed.
     const vocalisStarter = runVocalisProtocol(players, history, false, architectId);
-    
-    // Update History with new starter
     const newStartingPlayers = [vocalisStarter.id, ...history.lastStartingPlayers].slice(0, 10);
 
-    // 6. Construct Game Data
     const gamePlayers: GamePlayer[] = players.map(p => {
         const key = p.name.trim().toLowerCase();
         const isImp = selectedKeys.includes(key);
         const weightObj = playerWeights.find(pw => pw.player.name.trim().toLowerCase() === key);
         const rawWeight = weightObj ? weightObj.weight : 0;
-        
-        // Calculate Percentage Chance
         const probability = grandTotalWeight > 0 ? (rawWeight / grandTotalWeight) * 100 : 0;
 
         let displayWord = wordPair.civ;
@@ -595,21 +675,30 @@ export const generateGameData = (config: GameConfig): {
         };
     });
 
+    // Clean up history size
+    if (newPastImpostorIds.length > 20) newPastImpostorIds.length = 20;
+
     return { 
         players: gamePlayers, 
-        isTrollEvent: false, 
-        trollScenario: null,
+        isTrollEvent: isTrollEvent, 
+        trollScenario: trollScenario,
         isArchitectTriggered: isArchitectTriggered,
         designatedStarter: vocalisStarter.name,
         newHistory: {
             roundCounter: currentRound,
             lastWords: newHistoryWords,
-            lastCategories: newHistoryCategories, // Update Omniscient Filter
-            globalWordUsage: newGlobalWordUsage, // Update Vital Penalty
+            lastCategories: newHistoryCategories,
+            globalWordUsage: newGlobalWordUsage,
             playerStats: newPlayerStats,
-            lastTrollRound: history.lastTrollRound,
+            lastTrollRound: isTrollEvent ? currentRound : history.lastTrollRound,
             lastArchitectRound: isArchitectTriggered ? currentRound : history.lastArchitectRound,
-            lastStartingPlayers: newStartingPlayers
+            lastStartingPlayers: newStartingPlayers,
+            
+            // Update v6.1 State
+            pastImpostorIds: newPastImpostorIds,
+            paranoiaLevel: breakProtocolType ? 0 : paranoiaLevel, // Reset on break
+            coolingDownRounds: breakProtocolType ? 3 : Math.max(0, coolingRounds - 1),
+            lastBreakProtocol: breakProtocolType
         }
     };
 };

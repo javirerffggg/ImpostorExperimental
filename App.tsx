@@ -4,6 +4,7 @@ import { Background } from './components/Background';
 import { IdentityCard } from './components/IdentityCard';
 import { PartyNotification } from './components/PartyNotification';
 import { ArchitectCuration } from './components/ArchitectCuration';
+import { DebugConsole } from './components/DebugConsole';
 import { generateGameData, generateArchitectOptions, generateSmartHint } from './utils/gameLogic';
 import { THEMES, DEFAULT_PLAYERS, PLAYER_COLORS } from './constants';
 import { CATEGORIES_DATA } from './categories';
@@ -444,6 +445,11 @@ function App() {
                 architectMode: false, // Default to DISABLED
                 selectedCategories: []
             },
+            debugState: {
+                isEnabled: false,
+                forceTroll: null,
+                forceArchitect: false
+            },
             currentDrinkingPrompt: "",
             theme: 'illojuan'
         };
@@ -471,6 +477,10 @@ function App() {
     // -- Architect State --
     const [architectOptions, setArchitectOptions] = useState<[ { categoryName: string, wordPair: CategoryData }, { categoryName: string, wordPair: CategoryData } ] | null>(null);
     const [architectRegenCount, setArchitectRegenCount] = useState(0);
+
+    // -- Centinela Protocol Activation State --
+    const [debugTapCount, setDebugTapCount] = useState(0);
+    const debugTapTimerRef = useRef<number | null>(null);
 
     // -- Party Mode Specific State --
     const [batteryLevel, setBatteryLevel] = useState(100);
@@ -541,6 +551,33 @@ function App() {
 
     // -- Handlers --
 
+    // PROTOCOL CENTINELA ACTIVATION HANDLER
+    const handleTitleTap = () => {
+        if (gameState.debugState.isEnabled) return; // Already active
+
+        // Clear existing timer to reset count
+        if (debugTapTimerRef.current) clearTimeout(debugTapTimerRef.current);
+
+        setDebugTapCount(prev => {
+            const newCount = prev + 1;
+            if (newCount >= 5) {
+                // ACTIVATE CENTINELA
+                if (navigator.vibrate) navigator.vibrate([100, 50, 50, 50, 200]); // Morse-like pattern
+                setGameState(prev => ({
+                    ...prev,
+                    debugState: { ...prev.debugState, isEnabled: true }
+                }));
+                return 0;
+            }
+            return newCount;
+        });
+
+        // Reset count if no tap within 1 second
+        debugTapTimerRef.current = window.setTimeout(() => {
+            setDebugTapCount(0);
+        }, 800);
+    };
+
     const startGame = () => {
         if (gameState.players.length < 3) return;
 
@@ -552,11 +589,23 @@ function App() {
             useTrollMode: gameState.settings.trollMode,
             useArchitectMode: gameState.settings.architectMode,
             selectedCats: gameState.settings.selectedCategories,
-            history: gameState.history 
+            history: gameState.history,
+            // Pass debug overrides if active
+            debugOverrides: gameState.debugState.isEnabled ? {
+                forceTroll: gameState.debugState.forceTroll,
+                forceArchitect: gameState.debugState.forceArchitect
+            } : undefined
         });
 
         // Use the Vocalis designated starter
         const startingPlayer = designatedStarter;
+
+        // RESET DEBUG FORCING FLAGS AFTER CONSUMPTION
+        const cleanDebugState = {
+            ...gameState.debugState,
+            forceTroll: null,
+            forceArchitect: false
+        };
 
         // -- ARCHITECT FLOW INTERCEPTION --
         if (isArchitectTriggered) {
@@ -582,7 +631,8 @@ function App() {
                     currentPlayerIndex: firstCivilIndex, // Architect goes first
                     startingPlayer,
                     history: newHistory,
-                    currentDrinkingPrompt: ""
+                    currentDrinkingPrompt: "",
+                    debugState: cleanDebugState
                 }));
                 setIsExiting(false);
                 setIsPixelating(false);
@@ -601,7 +651,8 @@ function App() {
             currentPlayerIndex: 0,
             startingPlayer,
             history: newHistory, 
-            currentDrinkingPrompt: ""
+            currentDrinkingPrompt: "",
+            debugState: cleanDebugState
         }));
         setHasSeenCurrentCard(false);
         setIsExiting(false);
@@ -786,6 +837,15 @@ function App() {
 
         return (
             <div className={`flex flex-col h-full relative z-10 animate-in fade-in duration-500 pt-[env(safe-area-inset-top)] ${isPixelating ? 'animate-dissolve' : ''}`}>
+                 
+                 {/* PROTOCOL CENTINELA: DEBUG CONSOLE */}
+                 <DebugConsole gameState={gameState} setGameState={setGameState} />
+                 
+                 {/* AMBER FLASH EFFECT WHEN DEBUG ACTIVE */}
+                 {gameState.debugState.isEnabled && (
+                     <div className="fixed inset-0 pointer-events-none z-[60] border-4 border-amber-500/50 animate-pulse" />
+                 )}
+
                  {/* PARTY NOTIFICATION OVERLAY */}
                  {isParty && gameState.currentDrinkingPrompt && (
                     <div className="absolute top-20 left-0 right-0 z-50 flex justify-center px-4 pointer-events-none">
@@ -799,7 +859,14 @@ function App() {
 
                 <div className="flex-1 overflow-y-auto px-6 pb-48 space-y-6">
                     <header className="pt-6 text-center space-y-2 mb-2">
-                        <h1 style={{ color: theme.text, fontFamily: theme.font }} className="text-5xl font-black italic tracking-tighter">IMPOSTOR</h1>
+                        {/* TAP TRIGGER AREA */}
+                        <h1 
+                            onClick={handleTitleTap}
+                            style={{ color: theme.text, fontFamily: theme.font }} 
+                            className="text-5xl font-black italic tracking-tighter select-none cursor-default active:opacity-80 transition-opacity"
+                        >
+                            IMPOSTOR
+                        </h1>
                         {isParty && <p style={{ color: theme.accent }} className="text-xs font-black uppercase tracking-[0.3em] animate-pulse">DRINKING EDITION</p>}
                     </header>
 
@@ -1087,6 +1154,7 @@ function App() {
                         readyForNext={hasSeenCurrentCard}
                         isLastPlayer={isLastPlayer}
                         isParty={gameState.settings.partyMode}
+                        debugMode={gameState.debugState.isEnabled} // Pass debug flag
                     />
                 </div>
                 

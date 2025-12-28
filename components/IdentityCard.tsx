@@ -12,9 +12,10 @@ interface Props {
     readyForNext: boolean;
     isLastPlayer: boolean;
     isParty?: boolean;
+    debugMode?: boolean; // New prop for Centinela
 }
 
-export const IdentityCard: React.FC<Props> = ({ player, theme, color, onRevealStart, onRevealEnd, nextAction, readyForNext, isLastPlayer, isParty }) => {
+export const IdentityCard: React.FC<Props> = ({ player, theme, color, onRevealStart, onRevealEnd, nextAction, readyForNext, isLastPlayer, isParty, debugMode }) => {
     // Reveal States
     const [isHolding, setIsHolding] = useState(false);
     const [hasInteracted, setHasInteracted] = useState(false);
@@ -155,6 +156,7 @@ export const IdentityCard: React.FC<Props> = ({ player, theme, color, onRevealSt
     };
 
     const getFontSize = (text: string) => {
+        if (text.length > 20) return '1.2rem'; // Extra small for very long text
         if (text.length > 15) return '1.5rem';
         if (text.length > 10) return '2.2rem';
         return '3rem';
@@ -212,10 +214,13 @@ export const IdentityCard: React.FC<Props> = ({ player, theme, color, onRevealSt
                         '--card-shadow-strong': `${color}80`,
                         
                         background: `linear-gradient(135deg, ${theme.cardBg} 0%, ${color}20 100%)`,
-                        borderColor: isHolding ? color : `${theme.border}`,
+                        
+                        // FIX 1: Border is strictly transparent when idle to eliminate "gray bar" artifact
+                        borderColor: isHolding ? color : 'transparent', 
                         borderRadius: theme.radius,
-                        // Reduced drop-shadow on the element itself since we have the aura now
-                        boxShadow: isHolding ? `0 0 50px ${color}50` : '0 10px 30px rgba(0,0,0,0.3)',
+                        
+                        // Enhanced shadow in idle state to compensate for missing border
+                        boxShadow: isHolding ? `0 0 50px ${color}50` : '0 10px 40px rgba(0,0,0,0.4)',
                         
                         // Glassmorphism Fixes
                         backdropFilter: 'blur(24px)',
@@ -262,10 +267,11 @@ export const IdentityCard: React.FC<Props> = ({ player, theme, color, onRevealSt
                         />
                     )}
 
-                    <div className={`absolute inset-0 z-10 flex flex-col items-center justify-center p-6 text-center transition-all duration-200 ${isHolding ? 'pb-32' : ''}`}>
+                    {/* MAIN CONTENT CONTAINER - FIX 2: Layout Structure to prevent clipping */}
+                    <div className={`absolute inset-0 z-10 flex flex-col transition-all duration-200 ${isHolding ? 'justify-between py-6' : 'justify-center p-6'}`}>
                         
                         {!isHolding ? (
-                            <div className="flex flex-col items-center gap-6 animate-pulse">
+                            <div className="flex flex-col items-center gap-6 animate-pulse mt-auto mb-auto">
                                 <div 
                                     className="w-24 h-24 rounded-full border-4 flex items-center justify-center transition-colors duration-300"
                                     style={{ borderColor: color }}
@@ -277,82 +283,109 @@ export const IdentityCard: React.FC<Props> = ({ player, theme, color, onRevealSt
                                 </p>
                             </div>
                         ) : (
-                            <div className="flex flex-col items-center gap-4 animate-in fade-in duration-200">
-                                {player.isImp ? (
-                                    <div className="relative flex items-center justify-center mb-2 mt-2">
-                                        {/* Aura Effects Impostor - Glitched */}
-                                        <div className="absolute w-28 h-28 bg-red-600/30 rounded-full blur-xl animate-pulse" />
-                                        {/* Rotating dashed circle glitching out */}
-                                        <div 
-                                            className="absolute w-24 h-24 rounded-full border border-red-500/30 border-dashed opacity-60 animate-spin-glitch"
-                                        />
-                                        <div 
-                                            className="absolute w-16 h-16 bg-red-500/20 rounded-full blur-md mix-blend-screen"
-                                            style={{ animation: 'imp-aura-pulse 0.2s ease-in-out infinite' }} // Fast pulse
-                                        />
-                                        <Skull 
-                                            size={48} 
-                                            className="text-red-500 relative z-10 drop-shadow-[0_0_10px_rgba(220,38,38,0.8)] animate-impostor-shake" 
-                                        />
-                                    </div>
-                                ) : (
-                                    <div className="relative flex items-center justify-center mb-2 mt-2">
-                                        {/* Aura Effects Civil (Clean) */}
-                                        <div className="absolute w-28 h-28 bg-green-600/30 rounded-full blur-xl animate-pulse" />
-                                        <div 
-                                            className="absolute w-24 h-24 rounded-full border border-green-500/30 border-dashed opacity-60"
-                                            style={{ animation: 'imp-aura-spin 12s linear infinite reverse' }}
-                                        />
-                                        <div 
-                                            className="absolute w-16 h-16 bg-green-500/20 rounded-full blur-md mix-blend-screen"
-                                            style={{ animation: 'imp-aura-pulse 3s ease-in-out infinite' }}
-                                        />
-                                        <Shield 
-                                            size={48} 
-                                            className="text-green-500 relative z-10 drop-shadow-[0_0_10px_rgba(34,197,94,0.8)]" 
-                                        />
-                                    </div>
-                                )}
-
-                                <h3 
-                                    className={`text-xl font-black uppercase tracking-widest 
-                                        ${player.isImp ? 'text-red-500 glitch-text-anim' : 'text-green-500'}`}
-                                    data-text={player.role} // For CSS content trick
-                                >
-                                    {player.role}
-                                </h3>
-
-                                <div className={`w-full h-px my-2 ${player.isImp ? 'bg-red-500/50 animate-pulse' : 'bg-white/20'}`} />
-
-                                {!player.isImp && (
-                                    <p style={{ color: theme.sub }} className="text-xs font-black uppercase tracking-[0.2em] mb-1">
-                                        Categoría: {player.category}
-                                    </p>
-                                )}
+                            <div className="flex flex-col items-center justify-between w-full h-full animate-in fade-in duration-200">
                                 
-                                <p 
-                                    style={{ 
-                                        fontSize: getFontSize(player.word),
-                                        color: theme.text,
-                                    }}
-                                    className={`font-black leading-tight break-words uppercase ${player.isImp ? 'glitch-text-anim' : ''}`}
-                                    data-text={player.word}
-                                >
-                                    {player.word}
-                                </p>
+                                {/* TOP SECTION: Role & Icon (Fixed Height / No Shrink) */}
+                                <div className="flex-none flex flex-col items-center justify-center gap-2 w-full pt-1">
+                                    {player.isImp ? (
+                                        <div className="relative flex items-center justify-center mb-1">
+                                            {/* Aura Effects Impostor - Glitched */}
+                                            <div className="absolute w-28 h-28 bg-red-600/30 rounded-full blur-xl animate-pulse" />
+                                            {/* Rotating dashed circle glitching out */}
+                                            <div 
+                                                className="absolute w-24 h-24 rounded-full border border-red-500/30 border-dashed opacity-60 animate-spin-glitch"
+                                            />
+                                            <div 
+                                                className="absolute w-16 h-16 bg-red-500/20 rounded-full blur-md mix-blend-screen"
+                                                style={{ animation: 'imp-aura-pulse 0.2s ease-in-out infinite' }} // Fast pulse
+                                            />
+                                            <Skull 
+                                                size={48} 
+                                                className="text-red-500 relative z-10 drop-shadow-[0_0_10px_rgba(220,38,38,0.8)] animate-impostor-shake" 
+                                            />
+                                        </div>
+                                    ) : (
+                                        <div className="relative flex items-center justify-center mb-1">
+                                            {/* Aura Effects Civil (Clean) */}
+                                            <div className="absolute w-28 h-28 bg-green-600/30 rounded-full blur-xl animate-pulse" />
+                                            <div 
+                                                className="absolute w-24 h-24 rounded-full border border-green-500/30 border-dashed opacity-60"
+                                                style={{ animation: 'imp-aura-spin 12s linear infinite reverse' }}
+                                            />
+                                            <div 
+                                                className="absolute w-16 h-16 bg-green-500/20 rounded-full blur-md mix-blend-screen"
+                                                style={{ animation: 'imp-aura-pulse 3s ease-in-out infinite' }}
+                                            />
+                                            <Shield 
+                                                size={48} 
+                                                className="text-green-500 relative z-10 drop-shadow-[0_0_10px_rgba(34,197,94,0.8)]" 
+                                            />
+                                        </div>
+                                    )}
 
-                                <p style={{ color: theme.sub }} className="text-[10px] mt-4 uppercase tracking-widest">
-                                    Soltar para ocultar
-                                </p>
+                                    <h3 
+                                        className={`text-xl font-black uppercase tracking-widest 
+                                            ${player.isImp ? 'text-red-500 glitch-text-anim' : 'text-green-500'}`}
+                                        data-text={player.role} // For CSS content trick
+                                    >
+                                        {player.role}
+                                    </h3>
+
+                                    {!player.isImp && (
+                                        <p style={{ color: theme.sub }} className="text-xs font-black uppercase tracking-[0.2em]">
+                                            CATEGORÍA: {player.category}
+                                        </p>
+                                    )}
+
+                                    <div className={`w-2/3 h-px my-2 ${player.isImp ? 'bg-red-500/50 animate-pulse' : 'bg-white/20'}`} />
+                                </div>
+
+                                {/* MIDDLE SECTION: Word (Flexible, centers in available space, handles overflow) */}
+                                <div className="flex-1 flex items-center justify-center w-full px-2 overflow-hidden my-auto">
+                                    <p 
+                                        style={{ 
+                                            fontSize: getFontSize(player.word),
+                                            // Gradient Typography Effect
+                                            background: player.isImp 
+                                                ? 'linear-gradient(180deg, #ffffff 0%, #ff3333 40%, #500000 100%)' // Impostor: White -> Bright Red -> Blood Red
+                                                : `linear-gradient(180deg, ${theme.text} 0%, ${color} 100%)`, // Civil: Theme Text -> Player Color
+                                            WebkitBackgroundClip: 'text',
+                                            WebkitTextFillColor: 'transparent',
+                                            backgroundClip: 'text',
+                                            
+                                            maxHeight: '100%',
+                                            display: '-webkit-box',
+                                            WebkitLineClamp: 4, 
+                                            WebkitBoxOrient: 'vertical',
+                                            overflow: 'hidden'
+                                        }}
+                                        className={`font-black leading-tight text-center break-words uppercase ${player.isImp ? 'glitch-text-anim' : ''}`}
+                                        data-text={player.word}
+                                    >
+                                        {player.word}
+                                    </p>
+                                </div>
+
+                                {/* BOTTOM SECTION: Footer Hint (Fixed) */}
+                                <div className="flex-none mt-auto pb-1">
+                                    <p style={{ color: theme.sub }} className="text-[10px] uppercase tracking-widest opacity-60">
+                                        Soltar para ocultar
+                                    </p>
+                                </div>
                             </div>
                         )}
                     </div>
-
-                    {/* Corner Markers - Reduced Opacity to avoid Looking like a solid bar */}
-                    <div className="absolute top-4 left-4 w-4 h-4 border-l-2 border-t-2 opacity-30 transition-colors z-10" style={{ borderColor: isHolding ? color : theme.text }}/>
-                    <div className="absolute top-4 right-4 w-4 h-4 border-r-2 border-t-2 opacity-30 transition-colors z-10" style={{ borderColor: isHolding ? color : theme.text }}/>
-                    <div className="absolute bottom-4 left-4 w-4 h-4 border-l-2 border-b-2 opacity-30 transition-colors z-10" style={{ borderColor: isHolding ? color : theme.text }}/>
-                    <div className="absolute bottom-4 right-4 w-4 h-4 border-r-2 border-b-2 opacity-30 transition-colors z-10" style={{ borderColor: isHolding ? color : theme.text }}/>
+                    
+                    {/* CENTINELA PROTOCOL: Debug Overlay */}
+                    {debugMode && (
+                        <div className="absolute bottom-1 left-1 z-50 p-1 pointer-events-none opacity-80 bg-black/50 backdrop-blur-sm rounded border border-amber-500/50">
+                            <p className="text-[8px] font-mono text-amber-500 leading-tight">
+                                ID: {player.role.slice(0,3).toUpperCase()}<br/>
+                                W: {player.realWord.slice(0,6)}...<br/>
+                                P: {Math.round(player.impostorProbability)}%
+                            </p>
+                        </div>
+                    )}
                 </div>
             </div>
 

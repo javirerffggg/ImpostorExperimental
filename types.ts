@@ -1,3 +1,4 @@
+
 export type ThemeName = 'midnight' | 'obsidian' | 'solar' | 'cyber' | 'bond' | 'turing' | 'illojuan' | 'material' | 'zenith' | 'protocol' | 'ethereal' | 'terminal84' | 'soft' | 'noir' | 'paper' | 'space' | 'nightclub';
 
 export interface ThemeConfig {
@@ -51,12 +52,19 @@ export interface InfinityVault {
         impostorRatio: number;
         civilStreak: number;
         totalImpostorWins: number; // Placeholder for future logic
+        quarantineRounds: number; // v6.1: Post-Paranoia Lockdown
     };
     categoryDNA: Record<string, CategoryDNA>;
     sequenceAnalytics: SequenceAnalytics;
 }
 
 export type TrollScenario = 'espejo_total' | 'civil_solitario' | 'falsa_alarma';
+
+export interface DebugState {
+    isEnabled: boolean;
+    forceTroll: TrollScenario | null;
+    forceArchitect: boolean;
+}
 
 export interface GameState {
     phase: 'setup' | 'architect' | 'revealing' | 'discussion' | 'results';
@@ -77,6 +85,12 @@ export interface GameState {
         lastTrollRound: number; 
         lastArchitectRound: number; // MDE v5.0 Tracking
         lastStartingPlayers: string[]; // VOCALIS: Oratory Fatigue Tracking
+        
+        // v6.1 Paranoia Engine
+        pastImpostorIds: string[]; // Track actual impostor IDs for pattern detection
+        paranoiaLevel: number; // 0-100%
+        coolingDownRounds: number; // 3, 2, 1, 0 (Rebote Post-Crisis)
+        lastBreakProtocol: string | null; // For Debug/Logging
     };
     settings: {
         hintMode: boolean;
@@ -85,6 +99,7 @@ export interface GameState {
         architectMode: boolean; // New setting
         selectedCategories: string[];
     };
+    debugState: DebugState; // PROTOCOL CENTINELA
     currentDrinkingPrompt: string;
     theme: ThemeName;
 }
