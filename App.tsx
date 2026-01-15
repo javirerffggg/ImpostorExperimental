@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Settings, Users, Ghost, Zap, Shuffle, RotateCcw, Monitor, ChevronRight, X, Check, ShieldAlert, Mic, LayoutGrid, CheckCheck, Eye, Lock, Fingerprint, Save, Trash2, Database, Beer, PartyPopper, MessageCircle, AlertTriangle, FileWarning, BarChart3, ScanEye, Flame, Timer, Percent, ShieldCheck, Unlock, FileText, Radio } from 'lucide-react';
+import { Settings, Users, Ghost, Zap, Shuffle, RotateCcw, Monitor, ChevronRight, X, Check, ShieldAlert, Mic, LayoutGrid, CheckCheck, Eye, Lock, Fingerprint, Save, Trash2, Database, Beer, PartyPopper, MessageCircle, AlertTriangle, FileWarning, BarChart3, ScanEye, Flame, Timer, Percent, ShieldCheck, Unlock, FileText, Radio, Droplets } from 'lucide-react';
 import { Background } from './components/Background';
 import { IdentityCard } from './components/IdentityCard';
 import { PartyNotification } from './components/PartyNotification';
@@ -9,7 +9,7 @@ import { generateGameData, generateArchitectOptions, generateSmartHint } from '.
 import { THEMES, DEFAULT_PLAYERS, PLAYER_COLORS } from './constants';
 import { CATEGORIES_DATA } from './categories';
 import { GameState, ThemeName, Player, ThemeConfig, CategoryData } from './types';
-import { getPartyMessage, getBatteryLevel } from './utils/partyLogic';
+import { getPartyMessage, getBatteryLevel, calculatePartyIntensity } from './utils/partyLogic';
 
 // --- Sub-components extracted to fix Hook Rules violations ---
 
@@ -295,6 +295,7 @@ const ResultsView: React.FC<{
                     {gameState.gameData.map((p, idx) => {
                         const isImp = p.isImp && !isTroll;
                         const suspicion = getSuspicionTag(p.viewTime);
+                        const isBartender = p.partyRole === 'bartender' && isParty;
                         
                         return (
                             <div 
@@ -320,6 +321,7 @@ const ResultsView: React.FC<{
                                                 </>
                                             )}
                                             {p.isArchitect && <span className="text-[8px] px-1 rounded bg-yellow-500/20 text-yellow-600 font-black">ARQ</span>}
+                                            {isBartender && <Beer size={12} className="text-pink-500"/>}
                                         </div>
                                         <div className="flex items-center gap-2 mt-0.5">
                                             <Timer size={10} style={{ color: theme.sub }} />
@@ -452,6 +454,12 @@ function App() {
                 forceTroll: null,
                 forceArchitect: false
             },
+            // v4.0 BACCHUS INITIAL STATE
+            partyState: {
+                intensity: 'aperitivo',
+                consecutiveHardcoreRounds: 0,
+                isHydrationLocked: false
+            },
             currentDrinkingPrompt: "",
             theme: 'illojuan'
         };
@@ -487,6 +495,7 @@ function App() {
     // -- Party Mode Specific State --
     const [batteryLevel, setBatteryLevel] = useState(100);
     const promptTimeoutRef = useRef<number | null>(null);
+    const [hydrationTimer, setHydrationTimer] = useState(0); // For countdown
 
     // -- Derived State for Aesthetics --
     const currentPlayerColor = PLAYER_COLORS[gameState.currentPlayerIndex % PLAYER_COLORS.length];
@@ -548,7 +557,7 @@ function App() {
         }, 120000); // Every 2 minutes
 
         return () => clearInterval(interval);
-    }, [gameState.settings.partyMode, gameState.phase, batteryLevel]);
+    }, [gameState.settings.partyMode, gameState.phase, batteryLevel, gameState.partyState.intensity]); // Added dependencies
 
 
     // -- Handlers --
@@ -596,7 +605,8 @@ function App() {
             debugOverrides: gameState.debugState.isEnabled ? {
                 forceTroll: gameState.debugState.forceTroll,
                 forceArchitect: gameState.debugState.forceArchitect
-            } : undefined
+            } : undefined,
+            isPartyMode: gameState.settings.partyMode // Pass Party Mode flag
         });
 
         // Use the Vocalis designated starter
@@ -608,6 +618,32 @@ function App() {
             forceTroll: null,
             forceArchitect: false
         };
+
+        // --- BACCHUS LOGIC: UPDATE PARTY STATE ---
+        let newPartyState = { ...gameState.partyState };
+        if (gameState.settings.partyMode) {
+            const newIntensity = calculatePartyIntensity(newHistory.roundCounter);
+            let consecutiveHardcore = newPartyState.consecutiveHardcoreRounds;
+            
+            if (newIntensity === 'after_hours') {
+                consecutiveHardcore += 1;
+            } else {
+                consecutiveHardcore = 0; // Reset if intensity drops (e.g. manual reset)
+            }
+
+            // Hydration Lock Check (Every 4 hardcore rounds)
+            if (consecutiveHardcore >= 4) {
+                newPartyState.isHydrationLocked = true;
+                consecutiveHardcore = 0; // Reset counter
+                setHydrationTimer(20); // Start 20s countdown
+            }
+
+            newPartyState = {
+                intensity: newIntensity,
+                consecutiveHardcoreRounds: consecutiveHardcore,
+                isHydrationLocked: newPartyState.isHydrationLocked // Preserve existing lock if any
+            };
+        }
 
         // -- ARCHITECT FLOW INTERCEPTION --
         if (isArchitectTriggered) {
@@ -634,7 +670,8 @@ function App() {
                     startingPlayer,
                     history: newHistory,
                     currentDrinkingPrompt: "",
-                    debugState: cleanDebugState
+                    debugState: cleanDebugState,
+                    partyState: newPartyState // Update Party State
                 }));
                 setIsExiting(false);
                 setIsPixelating(false);
@@ -654,7 +691,8 @@ function App() {
             startingPlayer,
             history: newHistory, 
             currentDrinkingPrompt: "",
-            debugState: cleanDebugState
+            debugState: cleanDebugState,
+            partyState: newPartyState // Update Party State
         }));
         setHasSeenCurrentCard(false);
         setIsExiting(false);
@@ -736,7 +774,7 @@ function App() {
                     phase: 'results',
                     currentDrinkingPrompt: "" 
                 }));
-                // Trigger results message
+                // Trigger results message (TRIBUNAL)
                 if (gameState.settings.partyMode) {
                     let winState: 'troll' | 'impostor' | 'civil' = Math.random() > 0.5 ? 'impostor' : 'civil';
                     if (gameState.isTrollEvent) winState = 'troll';
@@ -831,11 +869,73 @@ function App() {
         });
     };
 
+    // --- HYDRATION LOCK LOGIC ---
+    useEffect(() => {
+        let interval: number;
+        if (gameState.partyState.isHydrationLocked && hydrationTimer > 0) {
+            interval = window.setInterval(() => {
+                setHydrationTimer(prev => prev - 1);
+            }, 1000);
+        } else if (gameState.partyState.isHydrationLocked && hydrationTimer <= 0) {
+            // Unlock is manual via button, timer just enables the button
+        }
+        return () => clearInterval(interval);
+    }, [gameState.partyState.isHydrationLocked, hydrationTimer]);
+
+    const handleHydrationUnlock = () => {
+        setGameState(prev => ({
+            ...prev,
+            partyState: { ...prev.partyState, isHydrationLocked: false }
+        }));
+    };
+
     // -- Renders --
+
+    const renderHydrationLock = () => (
+        <div className="fixed inset-0 z-[100] bg-[#020617] flex flex-col items-center justify-center p-8 animate-in fade-in duration-500">
+            <div className="w-48 h-48 bg-blue-500/10 rounded-full flex items-center justify-center mb-8 relative">
+                <div className="absolute inset-0 bg-blue-500/20 rounded-full animate-ping opacity-20"/>
+                <Droplets size={80} className="text-blue-400 drop-shadow-[0_0_20px_rgba(96,165,250,0.5)] animate-bounce"/>
+            </div>
+            
+            <h2 className="text-3xl font-black text-blue-400 uppercase text-center mb-4 tracking-tighter">
+                Protocolo Hidratación
+            </h2>
+            
+            <p className="text-blue-200/70 text-center text-sm font-bold uppercase tracking-widest max-w-xs mb-12 leading-relaxed">
+                ¡ALTO! Los procesadores biológicos están sobrecalentados. Todo el grupo debe beber un vaso de agua antes de la siguiente fase de infiltración.
+            </p>
+
+            <button 
+                onClick={handleHydrationUnlock}
+                disabled={hydrationTimer > 0}
+                style={{ 
+                    backgroundColor: hydrationTimer > 0 ? '#1e293b' : '#3b82f6',
+                    color: hydrationTimer > 0 ? '#64748b' : 'white'
+                }}
+                className="w-full max-w-xs py-4 rounded-xl font-black uppercase tracking-widest text-sm shadow-lg transition-all active:scale-95 flex items-center justify-center gap-2"
+            >
+                {hydrationTimer > 0 ? (
+                    <>
+                        <Lock size={16} /> Espere {hydrationTimer}s
+                    </>
+                ) : (
+                    <>
+                        <Check size={20} strokeWidth={3} /> Sistemas Refrigerados
+                    </>
+                )}
+            </button>
+        </div>
+    );
 
     const renderSetup = () => {
         const isValidToStart = gameState.players.length >= 3;
         const isParty = gameState.settings.partyMode;
+
+        // If Hydration Lock is active, show overlay instead of setup
+        if (gameState.partyState.isHydrationLocked) {
+            return renderHydrationLock();
+        }
 
         return (
             <div className={`flex flex-col h-full relative z-10 animate-in fade-in duration-500 pt-[env(safe-area-inset-top)] ${isPixelating ? 'animate-dissolve' : ''}`}>
@@ -1156,7 +1256,8 @@ function App() {
                         readyForNext={hasSeenCurrentCard}
                         isLastPlayer={isLastPlayer}
                         isParty={gameState.settings.partyMode}
-                        debugMode={gameState.debugState.isEnabled} // Pass debug flag
+                        partyIntensity={gameState.partyState.intensity} // Pass intensity
+                        debugMode={gameState.debugState.isEnabled}
                     />
                 </div>
                 
@@ -1247,7 +1348,7 @@ function App() {
                             <p className="text-sm font-black text-pink-400 flex items-center gap-2">
                                 MODO FIESTA <Beer size={14}/>
                             </p>
-                            <p className="text-[10px] text-pink-300/70">Drinking Edition (Nightclub Theme)</p>
+                            <p className="text-[10px] text-pink-300/70">Protocolo BACCHUS v4.0</p>
                         </div>
                          <button 
                             onClick={togglePartyMode}

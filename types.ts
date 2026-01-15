@@ -20,6 +20,8 @@ export interface Player {
     name: string;
 }
 
+export type SocialRole = 'bartender' | 'vip' | 'alguacil' | 'bufon' | 'civil';
+
 export interface GamePlayer extends Player {
     role: 'Civil' | 'Impostor';
     word: string; // What they see on the card
@@ -30,6 +32,7 @@ export interface GamePlayer extends Player {
     impostorProbability: number; // The calculated % chance they had to be selected
     viewTime: number; // Milliseconds spent looking at the card
     isArchitect?: boolean; // New v5.0 Flag
+    partyRole?: SocialRole; // v4.0 BACCHUS
 }
 
 // --- PROTOCOL INFINITUM STRUCTURES ---
@@ -84,6 +87,14 @@ export interface DebugState {
     forceArchitect: boolean;
 }
 
+export type PartyIntensity = 'aperitivo' | 'hora_punta' | 'after_hours' | 'resaca';
+
+export interface PartyState {
+    intensity: PartyIntensity;
+    consecutiveHardcoreRounds: number; // To trigger water break
+    isHydrationLocked: boolean; // Safety lock
+}
+
 export interface GameState {
     phase: 'setup' | 'architect' | 'revealing' | 'discussion' | 'results';
     players: Player[];
@@ -124,6 +135,7 @@ export interface GameState {
         selectedCategories: string[];
     };
     debugState: DebugState; // PROTOCOL CENTINELA
+    partyState: PartyState; // v4.0 BACCHUS
     currentDrinkingPrompt: string;
     theme: ThemeName;
 }

@@ -1,6 +1,6 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { GamePlayer, ThemeConfig } from '../types';
-import { Fingerprint, Shield, Skull, Eye, Play, ArrowRight, Lock } from 'lucide-react';
+import { GamePlayer, ThemeConfig, PartyIntensity } from '../types';
+import { Fingerprint, Shield, Skull, Eye, Play, ArrowRight, Lock, Beer } from 'lucide-react';
 
 interface Props {
     player: GamePlayer;
@@ -12,10 +12,11 @@ interface Props {
     readyForNext: boolean;
     isLastPlayer: boolean;
     isParty?: boolean;
-    debugMode?: boolean; // New prop for Centinela
+    partyIntensity?: PartyIntensity; // New prop for visual effects
+    debugMode?: boolean; 
 }
 
-export const IdentityCard: React.FC<Props> = ({ player, theme, color, onRevealStart, onRevealEnd, nextAction, readyForNext, isLastPlayer, isParty, debugMode }) => {
+export const IdentityCard: React.FC<Props> = ({ player, theme, color, onRevealStart, onRevealEnd, nextAction, readyForNext, isLastPlayer, isParty, partyIntensity, debugMode }) => {
     // Reveal States
     const [isHolding, setIsHolding] = useState(false);
     const [hasInteracted, setHasInteracted] = useState(false);
@@ -32,6 +33,10 @@ export const IdentityCard: React.FC<Props> = ({ player, theme, color, onRevealSt
     const cardRef = useRef<HTMLDivElement>(null);
     const startPos = useRef({ x: 0, y: 0 });
     const isPointerDown = useRef(false);
+
+    // Visual Effects flags
+    const isHighIntensity = partyIntensity === 'after_hours' || partyIntensity === 'resaca';
+    const isBartender = player.partyRole === 'bartender';
 
     // Reset state when player changes
     useEffect(() => {
@@ -170,6 +175,11 @@ export const IdentityCard: React.FC<Props> = ({ player, theme, color, onRevealSt
 
     const isButtonVisible = readyForNext && !isHolding && !isDragging && dragPosition.y === 0;
 
+    // Apply "Vertigo" rotation if intense party mode
+    const rotationOverride = isHolding && isParty && isHighIntensity 
+        ? Math.sin(Date.now() / 200) * 3 
+        : 0;
+
     return (
         <div className="flex flex-col items-center gap-8 w-full max-w-sm z-10 relative">
             {/* Header: Compacts when holding to avoid overlap */}
@@ -239,7 +249,8 @@ export const IdentityCard: React.FC<Props> = ({ player, theme, color, onRevealSt
                             : 'transform 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.3s ease, border-width 0.1s ease',
                         
                         // ERGONOMICS v2.0: Reduced rotation for better reading stability
-                        transform: `translate3d(${dragPosition.x}px, ${dragPosition.y + (isHolding ? -20 : 0)}px, 0) rotate(${dragPosition.x * 0.03}deg)`,
+                        // BACCHUS: Add vertigo rotation
+                        transform: `translate3d(${dragPosition.x}px, ${dragPosition.y + (isHolding ? -20 : 0)}px, 0) rotate(${dragPosition.x * 0.03 + rotationOverride}deg)`,
                         
                         animation: (isHolding && !player.isImp) ? 'reveal-pulse 2s infinite' : 'none',
                         touchAction: 'none',
@@ -373,6 +384,16 @@ export const IdentityCard: React.FC<Props> = ({ player, theme, color, onRevealSt
                                         {player.role}
                                     </h3>
 
+                                    {/* BACCHUS: PARTY ROLE DISPLAY */}
+                                    {isParty && player.partyRole && player.partyRole !== 'civil' && (
+                                        <div className="bg-pink-500/20 border border-pink-500/50 px-2 py-0.5 rounded-full flex items-center gap-1 animate-pulse mb-1">
+                                            <Beer size={10} className="text-pink-400" />
+                                            <span className="text-[10px] font-black text-pink-400 uppercase tracking-widest">
+                                                ROL: {player.partyRole}
+                                            </span>
+                                        </div>
+                                    )}
+
                                     {!player.isImp && (
                                         <p style={{ color: theme.sub }} className="text-xs font-black uppercase tracking-[0.2em]">
                                             CATEGORÍA: {player.category}
@@ -408,7 +429,7 @@ export const IdentityCard: React.FC<Props> = ({ player, theme, color, onRevealSt
                                             overflowWrap: 'anywhere',
                                             hyphens: 'auto'
                                         }}
-                                        className={`font-black leading-tight text-center uppercase ${player.isImp ? 'glitch-text-anim' : ''}`}
+                                        className={`font-black leading-tight text-center uppercase ${player.isImp || (isParty && isHighIntensity) ? 'glitch-text-anim' : ''}`}
                                         data-text={player.word}
                                     >
                                         {player.word}

@@ -1,6 +1,7 @@
 
 import { CATEGORIES_DATA } from '../categories';
 import { GamePlayer, Player, InfinityVault, TrollScenario, CategoryData, MatchLog } from '../types';
+import { assignPartyRoles, calculatePartyIntensity } from './partyLogic'; // BACCHUS Integration
 
 interface GameConfig {
     players: Player[];
@@ -33,6 +34,8 @@ interface GameConfig {
         forceTroll: TrollScenario | null;
         forceArchitect: boolean;
     }
+    // v4.0 BACCHUS Config
+    isPartyMode?: boolean;
 }
 
 // --- HELPER: Fisher-Yates Shuffle ---
@@ -406,7 +409,7 @@ export const generateGameData = (config: GameConfig): {
     designatedStarter: string; 
     newHistory: GameConfig['history'];
 } => {
-    const { players, impostorCount, useHintMode, useTrollMode, useArchitectMode, selectedCats, history, debugOverrides } = config;
+    const { players, impostorCount, useHintMode, useTrollMode, useArchitectMode, selectedCats, history, debugOverrides, isPartyMode } = config;
     
     const currentRound = history.roundCounter + 1;
     const availableCategories = selectedCats.length > 0 ? selectedCats : Object.keys(CATEGORIES_DATA);
@@ -541,6 +544,11 @@ export const generateGameData = (config: GameConfig): {
         });
         
         if (trollNewPastImpostorIds.length > 20) trollNewPastImpostorIds.length = 20;
+
+        // Apply BACCHUS Roles if Party Mode
+        if (isPartyMode) {
+            trollPlayers = assignPartyRoles(trollPlayers);
+        }
 
         const newLog: MatchLog = {
             id: Date.now().toString(),
@@ -767,7 +775,7 @@ export const generateGameData = (config: GameConfig): {
     const vocalisStarter = runVocalisProtocol(players, history, false, architectId);
     const newStartingPlayers = [vocalisStarter.id, ...history.lastStartingPlayers].slice(0, 10);
 
-    const gamePlayers: GamePlayer[] = players.map(p => {
+    let gamePlayers: GamePlayer[] = players.map(p => {
         const key = p.name.trim().toLowerCase();
         const isImp = selectedKeys.includes(key);
         const weightObj = playerWeights.find(pw => pw.player.name.trim().toLowerCase() === key);
@@ -795,6 +803,11 @@ export const generateGameData = (config: GameConfig): {
     });
 
     if (newPastImpostorIds.length > 20) newPastImpostorIds.length = 20;
+
+    // Apply BACCHUS Roles if Party Mode
+    if (isPartyMode) {
+        gamePlayers = assignPartyRoles(gamePlayers);
+    }
 
     // --- BLACK BOX LOGGING ---
     const newLog: MatchLog = {
