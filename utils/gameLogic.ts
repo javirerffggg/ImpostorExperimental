@@ -1,6 +1,6 @@
 
 import { CATEGORIES_DATA } from '../categories';
-import { GamePlayer, Player, InfinityVault, TrollScenario, CategoryData } from '../types';
+import { GamePlayer, Player, InfinityVault, TrollScenario, CategoryData, MatchLog } from '../types';
 
 interface GameConfig {
     players: Player[];
@@ -24,6 +24,10 @@ interface GameConfig {
         paranoiaLevel?: number;
         coolingDownRounds?: number;
         lastBreakProtocol?: string | null;
+        matchLogs?: MatchLog[];
+        
+        // v6.3 LETEO
+        lastLeteoRound?: number;
     };
     debugOverrides?: {
         forceTroll: TrollScenario | null;
@@ -64,12 +68,37 @@ const getVault = (uid: string, stats: Record<string, InfinityVault>): InfinityVa
     return stats[uid] || createNewVault(uid);
 };
 
-// 5. Casos Especiales: Efecto Novato
-const calculateNewbieBuffer = (weights: number[]): number => {
-    if (weights.length === 0) return 100;
-    const sorted = [...weights].sort((a, b) => a - b);
-    const index = Math.floor(sorted.length * 0.6); // 60th percentile
-    return sorted[index];
+// --- PROTOCOLO LETEO: Regularidad Aritmética ---
+const detectLinearPattern = (pastImpostorIds: string[], currentPlayers: Player[]): boolean => {
+    if (pastImpostorIds.length < 4) return false;
+    
+    const idToIndex = new Map(currentPlayers.map((p, i) => [p.id, i]));
+    const indices: number[] = [];
+    
+    // Get latest 4 impostors
+    for (let i = 0; i < 4; i++) {
+        const idx = idToIndex.get(pastImpostorIds[i]);
+        if (idx === undefined) return false; // Player missing, pattern broken
+        indices.push(idx);
+    }
+    
+    // Calculate jumps between rounds. Note: pastImpostorIds is [Recent, ..., Old]
+    // Jump 1: From Imp[1] to Imp[0]
+    // Jump 2: From Imp[2] to Imp[1]
+    // Jump 3: From Imp[3] to Imp[2]
+    
+    const N = currentPlayers.length;
+    const jumps: number[] = [];
+    
+    for (let i = 0; i < 3; i++) {
+        // Calculate forward jump in modular arithmetic
+        let jump = (indices[i] - indices[i+1]) % N;
+        if (jump < 0) jump += N;
+        jumps.push(jump);
+    }
+    
+    // Check if jumps are constant
+    return jumps[0] === jumps[1] && jumps[1] === jumps[2];
 };
 
 // --- FACTOR PARANOIA: PATTERN DETECTION (v2.0) ---
@@ -115,40 +144,36 @@ const calculateParanoiaScore = (
     return Math.min(100, score);
 };
 
-// 4. La Ecuación Maestra de INFINITUM (v6.1)
+// 4. La Ecuación Maestra de INFINITUM (v6.3 - LETEO COMPATIBLE)
 export const calculateInfinitumWeight = (
     player: Player, 
     vault: InfinityVault, 
     category: string, 
     currentRound: number,
-    coolingDownFactor: number = 1.0, // 1.0 = Normal, 0.25 = Strong Cooling
-    averageWeightEstimate: number = 100 // For Noise Calculation
+    coolingDownFactor: number = 1.0, 
+    averageWeightEstimate: number = 100,
+    entropyLevel: number = 0 // LETEO Variable (0 to 1)
 ): number => {
     
-    // Z. Quarantine Check (Marcador de Agente)
-    // CRITICAL: If quarantined, return extremely low weight to prevent selection in normal modes
-    // but not 0 to avoid division errors in ratios.
+    // Z. Quarantine Check
     if (vault.metrics.quarantineRounds > 0) {
         return 0.01; 
     }
 
-    // A. Motor de Frecuencia y Karma (V_fk) + Atenuación
+    // A. Motor de Frecuencia y Karma (V_fk)
     const base = 100;
     const ratio = Math.max(vault.metrics.impostorRatio, 0.01); 
-    
-    // v6.1: Attenuation during Cooling Phase
     const effectiveStreak = vault.metrics.civilStreak * coolingDownFactor; 
-    
     const v_fk = base * Math.log(effectiveStreak + 2) * (1 / ratio);
 
-    // B. Motor de Recencia y Secuencia (V_rs) - v6.1 SMOOTHED
+    // B. Motor de Recencia y Secuencia (V_rs)
     let v_rs = 1.0;
-    const history = vault.sequenceAnalytics.roleSequence; // [Most Recent, ..., Oldest]
+    const history = vault.sequenceAnalytics.roleSequence; 
     
-    if (history[0]) v_rs *= 0.05;      // Before: 0.0001 -> Now: 5% (Uncertainty Multiplier)
-    else if (history[1]) v_rs *= 0.30; // Before: 0.05 -> Now: 30%
-    else if (history[2]) v_rs *= 0.60; // Before: 0.20 -> Now: 60%
-    else if (history[3]) v_rs *= 1.0;  // Before: 0.50 -> Now: 100% (Clean Slate earlier)
+    if (history[0]) v_rs *= 0.05;      
+    else if (history[1]) v_rs *= 0.30; 
+    else if (history[2]) v_rs *= 0.60; 
+    else if (history[3]) v_rs *= 1.0;  
 
     // C. Motor de Afinidad de Categoría (V_ac)
     let v_ac = 1.0;
@@ -157,11 +182,18 @@ export const calculateInfinitumWeight = (
         v_ac *= 0.8; 
     }
 
-    // D. Ruido Cuántico (v6.1)
-    // Random float between 0 and 30% of average weight
+    // D. Cálculo Ponderado Estándar
+    const calculatedWeight = (v_fk * v_rs * v_ac);
+
+    // E. Ruido Cuántico
     const noise = Math.random() * (averageWeightEstimate * 0.3);
 
-    return (v_fk * v_rs * v_ac) + noise;
+    // --- ECUACIÓN LETEO (v6.3) ---
+    // Peso_Final = (Calculated) * (1 - Entropía) + (100 * Entropía)
+    // Si Entropía es 1 (Grade III), el peso es 100 para todos (Azar Puro).
+    const finalWeight = (calculatedWeight * (1 - entropyLevel)) + (100 * entropyLevel);
+
+    return finalWeight + noise;
 };
 
 // Helper for Debug Console
@@ -178,7 +210,7 @@ export const getDebugPlayerStats = (
         const key = p.name.trim().toLowerCase();
         const vault = getVault(key, stats);
         // Estimate avg weight as 100 for debug vis
-        const w = calculateInfinitumWeight(p, vault, dummyCat, round, 1.0, 100);
+        const w = calculateInfinitumWeight(p, vault, dummyCat, round, 1.0, 100, 0);
         weights.push(w);
         return { p, w, v: vault };
     });
@@ -380,7 +412,6 @@ export const generateGameData = (config: GameConfig): {
     const availableCategories = selectedCats.length > 0 ? selectedCats : Object.keys(CATEGORIES_DATA);
 
     // --- PROTOCOLO PANDORA & DEBUG ---
-    // Calculate simple troll stats if needed
     
     let isTrollEvent = false;
     let trollScenario: TrollScenario | null = null;
@@ -390,30 +421,48 @@ export const generateGameData = (config: GameConfig): {
         trollScenario = debugOverrides.forceTroll;
     }
 
-    // --- PARANOIA ENGINE v2.0 & DISTRIBUTIVE SINGULARITY ---
+    // --- PARANOIA ENGINE v2.0 & LETEO INTEGRATION ---
     
     // 1. Calculate Paranoia
     const pastImpostorIds = history.pastImpostorIds || [];
     const paranoiaLevel = calculateParanoiaScore(pastImpostorIds, players, currentRound);
     
     // 3. Post-Crisis Stabilization
-    // If coolingDownRounds > 0, we are recovering from a break protocol.
-    // Factor: 3->0.25, 2->0.50, 1->0.75, 0->1.0
     let coolingRounds = history.coolingDownRounds || 0;
     const coolingFactor = coolingRounds > 0 ? (1 - (coolingRounds * 0.25)) : 1.0;
 
     // 2. Determine if Break Protocol is needed (Red Level: > 70%)
-    let breakProtocolType: 'pandora' | 'mirror' | 'blind' | null = null;
+    let breakProtocolType: 'pandora' | 'mirror' | 'blind' | 'leteo' | null = null;
+    let leteoGrade: 0 | 1 | 2 | 3 = 0;
+    let entropyLevel = 0; // 0 to 1
     
-    // CRITICAL FIX: Ensure we do NOT trigger a new Break Protocol if we are actively cooling down.
-    // This prevents the "Mirror Loop" bug where quarantined players (low weight) get inverted 
-    // to high weight immediately after serving a sentence.
+    // Ensure we do NOT trigger a new Break Protocol if we are actively cooling down.
     if (!isTrollEvent && paranoiaLevel > 70 && coolingRounds === 0) {
         const roll = Math.random() * 100;
-        if (useTrollMode && roll < 50) {
+        
+        // PROTOCOLO LETEO (40% Probability)
+        if (roll < 40) {
+            breakProtocolType = 'leteo';
+            
+            // Determine LETEO Grade based on Linear Patterns or Paranoia Intensity
+            const hasLinearPattern = detectLinearPattern(pastImpostorIds, players);
+            
+            if (paranoiaLevel > 90) {
+                leteoGrade = 3; // Colapso Total
+                entropyLevel = 1.0;
+            } else if (hasLinearPattern) {
+                // If a strict mathematical pattern exists, apply strong entropy
+                leteoGrade = 2; // Entropía de Karma
+                entropyLevel = 0.6;
+            } else {
+                leteoGrade = 1; // Entropía de Recencia
+                entropyLevel = 0.3;
+            }
+
+        } else if (useTrollMode && roll < 65) { // 25% chance for Troll if enabled
             breakProtocolType = 'pandora';
             isTrollEvent = true;
-        } else if (roll < 80) { // 30% chance (or 80% if troll mode off)
+        } else if (roll < 90) { // Mirror
             breakProtocolType = 'mirror';
         } else {
             breakProtocolType = 'blind';
@@ -460,7 +509,7 @@ export const generateGameData = (config: GameConfig): {
         const vocalisStarter = runVocalisProtocol(players, history, false);
         const newStartingPlayers = [vocalisStarter.id, ...history.lastStartingPlayers].slice(0, 10);
 
-        // FIX: Update Vaults for Troll Events too, especially to apply Quarantine/Reset Streaks
+        // FIX: Update Vaults for Troll Events too
         const trollStats = { ...history.playerStats };
         const trollNewPastImpostorIds = [...pastImpostorIds];
 
@@ -471,39 +520,47 @@ export const generateGameData = (config: GameConfig): {
 
             vault.metrics.totalSessions += 1;
             
-            // Decrement existing quarantine
             if (vault.metrics.quarantineRounds > 0) {
                 vault.metrics.quarantineRounds -= 1;
             }
 
             if (p.isImp) {
                 vault.metrics.civilStreak = 0;
-                // Add to history
                 trollNewPastImpostorIds.unshift(p.id);
-
-                // For ANY troll event (chaos mode), we should quarantine the "Impostors" 
-                // to ensure a lottery reset in the next cooling rounds.
-                // In "Espejo Total", everyone gets quarantined -> Pure Lottery next round.
                 vault.metrics.quarantineRounds = 3; 
-
             } else {
-                 // Only increase streak if not in quarantine
                  if (vault.metrics.quarantineRounds === 0) {
                     vault.metrics.civilStreak += 1;
                 }
             }
             
-            // Update other metrics roughly
             const currentImpCount = (vault.metrics.impostorRatio * (vault.metrics.totalSessions - 1)) + (p.isImp ? 1 : 0);
             vault.metrics.impostorRatio = currentImpCount / vault.metrics.totalSessions;
 
             trollStats[key] = vault;
         });
         
-        // Truncate ID history
         if (trollNewPastImpostorIds.length > 20) trollNewPastImpostorIds.length = 20;
 
-        // RESET Paranoia after a crash/troll event
+        const newLog: MatchLog = {
+            id: Date.now().toString(),
+            timestamp: Date.now(),
+            round: currentRound,
+            category: catName,
+            word: basePair.civ,
+            impostors: trollPlayers.filter(p => p.isImp).map(p => p.name),
+            civilians: trollPlayers.filter(p => !p.isImp).map(p => p.name),
+            isTroll: true,
+            trollScenario: trollScenario,
+            paranoiaLevel: 0, // Reset
+            breakProtocol: null,
+            architect: null,
+            leteoGrade: 0,
+            entropyLevel: 0
+        };
+        const currentLogs = history.matchLogs || [];
+        const updatedLogs = [newLog, ...currentLogs].slice(0, 100);
+
         return { 
             players: trollPlayers, isTrollEvent: true, trollScenario: trollScenario, isArchitectTriggered: false, designatedStarter: vocalisStarter.name,
             newHistory: { 
@@ -511,11 +568,12 @@ export const generateGameData = (config: GameConfig): {
                 roundCounter: currentRound, 
                 lastTrollRound: currentRound, 
                 lastStartingPlayers: newStartingPlayers,
-                playerStats: trollStats, // UPDATE STATS
-                pastImpostorIds: trollNewPastImpostorIds, // UPDATE IDS
-                paranoiaLevel: 0, // Reset
-                coolingDownRounds: 3, // Start cooling
-                lastBreakProtocol: breakProtocolType || 'manual'
+                playerStats: trollStats,
+                pastImpostorIds: trollNewPastImpostorIds,
+                paranoiaLevel: 0,
+                coolingDownRounds: 3,
+                lastBreakProtocol: breakProtocolType || 'manual',
+                matchLogs: updatedLogs
             } 
         };
     }
@@ -528,52 +586,64 @@ export const generateGameData = (config: GameConfig): {
     // Shuffle Pre-Pick (v6.1 Feature C)
     const shuffledPlayers = shuffleArray(players);
 
-    // Prepare weights
-    const playerWeights: { player: Player, weight: number, vault: InfinityVault }[] = [];
-    const existingWeights: number[] = [];
+    // --- LETEO SHADOW VAULT LOGIC ---
+    // If LETEO is active, we create a manipulated stats object for calculation only
+    let calculationStats = currentStats;
     
-    // First, verify vaults exist and check newbies
-    shuffledPlayers.forEach(p => {
-        const key = p.name.trim().toLowerCase();
-        if (currentStats[key]) existingWeights.push(currentStats[key].metrics.civilStreak); // rough usage
-    });
-    const newbieWeight = 100; // Base value
+    if (breakProtocolType === 'leteo' && leteoGrade > 0) {
+        // Create deep copy for the "Ghost Vault"
+        calculationStats = JSON.parse(JSON.stringify(currentStats));
+        
+        if (leteoGrade >= 1) { 
+            // Grade I: Recency Entropy (Clear role sequence)
+            Object.values(calculationStats).forEach(v => {
+                v.sequenceAnalytics.roleSequence = []; // Amnesia
+            });
+        }
+        
+        if (leteoGrade >= 2) {
+            // Grade II: Karma Entropy (Average streaks)
+            const allStreaks = Object.values(calculationStats).map(v => v.metrics.civilStreak);
+            const avgStreak = allStreaks.reduce((a, b) => a + b, 0) / (allStreaks.length || 1);
+            Object.values(calculationStats).forEach(v => {
+                v.metrics.civilStreak = avgStreak; // Socialism
+            });
+        }
+    }
 
     // Average Weight Calculation for Quantum Noise
     let totalEstimatedWeight = 0;
     shuffledPlayers.forEach(p => {
         const key = p.name.trim().toLowerCase();
-        const vault = getVault(key, currentStats);
-        totalEstimatedWeight += calculateInfinitumWeight(p, vault, catName, currentRound, coolingFactor, 0); // No noise for estimation
+        const vault = getVault(key, calculationStats);
+        totalEstimatedWeight += calculateInfinitumWeight(p, vault, catName, currentRound, coolingFactor, 0, 0); // No noise, no entropy for estimate
     });
     const avgWeight = totalEstimatedWeight / (shuffledPlayers.length || 1);
 
-    // Calculate Final Weights
+    // Calculate Final Weights (using Shadow Vault if LETEO active)
+    const playerWeights: { player: Player, weight: number, vault: InfinityVault }[] = [];
+    
     shuffledPlayers.forEach(p => {
         const key = p.name.trim().toLowerCase();
-        let vault = getVault(key, currentStats);
+        const vault = getVault(key, calculationStats); // Use shadow vault if Leteo active
         let weight = 0;
 
         if (breakProtocolType === 'blind') {
-            weight = 100; // Blind Lottery
+            weight = 100;
         } else {
-            // Standard Infinitum with v6.1 features
+            // Pass entropyLevel to master equation
             weight = (vault.metrics.totalSessions === 0) 
-                ? newbieWeight 
-                : calculateInfinitumWeight(p, vault, catName, currentRound, coolingFactor, avgWeight);
+                ? 100 
+                : calculateInfinitumWeight(p, vault, catName, currentRound, coolingFactor, avgWeight, entropyLevel);
         }
         
-        playerWeights.push({ player: p, weight, vault });
+        // Pass original vault for updates later, but used weight derived from shadow vault
+        playerWeights.push({ player: p, weight, vault: getVault(key, currentStats) });
     });
 
     // Mirror Inversion Logic
     if (breakProtocolType === 'mirror') {
-        // Invert weights: heaviest becomes lightest
-        // Simple way: sort ascending instead of weighted random
         playerWeights.sort((a, b) => a.weight - b.weight); 
-        // Force the lowest weight (likely a quarantined player) to be super high just for selection
-        // This causes the Quarantined player to be picked IF mirror is active.
-        // The fix above (checking coolingRounds) ensures this block doesn't run during quarantine.
         playerWeights[0].weight = 999999; 
     }
 
@@ -612,7 +682,7 @@ export const generateGameData = (config: GameConfig): {
         selectedKeys.push(chosen.player.name.trim().toLowerCase());
     }
 
-    // Update Vaults & Quarantine
+    // Update REAL Vaults (Core Memory) - Always update real stats
     const newPlayerStats = { ...currentStats };
     const newPastImpostorIds = [...pastImpostorIds];
 
@@ -624,21 +694,19 @@ export const generateGameData = (config: GameConfig): {
 
         vault.metrics.totalSessions += 1;
         
-        // Handle Quarantine Decrement
         if (vault.metrics.quarantineRounds > 0) {
             vault.metrics.quarantineRounds -= 1;
         }
 
         if (isImp) {
             vault.metrics.civilStreak = 0;
-            newPastImpostorIds.unshift(p.id); // Add to Paranoia History
+            newPastImpostorIds.unshift(p.id); 
             
-            // Apply Quarantine if this was a Break Protocol selection
+            // Apply Quarantine if this was a Break Protocol
             if (breakProtocolType) {
-                vault.metrics.quarantineRounds = 3; // Lock them out for cooldown duration
+                vault.metrics.quarantineRounds = 3; 
             }
         } else {
-            // Only increase streak if not in quarantine
             if (vault.metrics.quarantineRounds === 0) {
                 vault.metrics.civilStreak += 1;
             }
@@ -726,8 +794,33 @@ export const generateGameData = (config: GameConfig): {
         };
     });
 
-    // Clean up history size
     if (newPastImpostorIds.length > 20) newPastImpostorIds.length = 20;
+
+    // --- BLACK BOX LOGGING ---
+    const newLog: MatchLog = {
+        id: Date.now().toString(),
+        timestamp: Date.now(),
+        round: currentRound,
+        category: catName,
+        word: wordPair.civ,
+        impostors: gamePlayers.filter(p => p.isImp).map(p => p.name),
+        civilians: gamePlayers.filter(p => !p.isImp).map(p => p.name),
+        isTroll: false,
+        trollScenario: null,
+        paranoiaLevel: breakProtocolType ? 0 : paranoiaLevel,
+        breakProtocol: breakProtocolType,
+        architect: architectId ? players.find(p => p.id === architectId)?.name || "Unknown" : null,
+        leteoGrade: leteoGrade,
+        entropyLevel: entropyLevel
+    };
+    const currentLogs = history.matchLogs || [];
+    const updatedLogs = [newLog, ...currentLogs].slice(0, 100);
+
+    // RESET LOGIC
+    // If LETEO was active (Grade III especially), we must HARD RESET cooling to 4 rounds.
+    const finalCoolingRounds = (breakProtocolType === 'leteo' && leteoGrade === 3) 
+        ? 4 // Hard Reset
+        : (breakProtocolType ? 3 : Math.max(0, coolingRounds - 1));
 
     return { 
         players: gamePlayers, 
@@ -745,11 +838,13 @@ export const generateGameData = (config: GameConfig): {
             lastArchitectRound: isArchitectTriggered ? currentRound : history.lastArchitectRound,
             lastStartingPlayers: newStartingPlayers,
             
-            // Update v6.1 State
+            // Update v6.1 & v6.3 State
             pastImpostorIds: newPastImpostorIds,
-            paranoiaLevel: breakProtocolType ? 0 : paranoiaLevel, // Reset on break
-            coolingDownRounds: breakProtocolType ? 3 : Math.max(0, coolingRounds - 1),
-            lastBreakProtocol: breakProtocolType
+            paranoiaLevel: breakProtocolType ? 0 : paranoiaLevel, 
+            coolingDownRounds: finalCoolingRounds,
+            lastBreakProtocol: breakProtocolType,
+            matchLogs: updatedLogs,
+            lastLeteoRound: breakProtocolType === 'leteo' ? currentRound : history.lastLeteoRound
         }
     };
 };

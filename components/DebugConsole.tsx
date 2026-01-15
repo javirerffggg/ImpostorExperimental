@@ -1,8 +1,7 @@
-
 import React, { useMemo } from 'react';
-import { GameState, TrollScenario } from '../types';
+import { GameState, TrollScenario, InfinityVault } from '../types';
 import { getDebugPlayerStats } from '../utils/gameLogic';
-import { Terminal, Database, AlertTriangle, ShieldCheck, RefreshCcw, Trash2, Power, Eye, Activity } from 'lucide-react';
+import { Terminal, Database, AlertTriangle, ShieldCheck, RefreshCcw, Power, Activity, FileText, Zap } from 'lucide-react';
 
 interface Props {
     gameState: GameState;
@@ -74,6 +73,48 @@ export const DebugConsole: React.FC<Props> = ({ gameState, setGameState }) => {
         });
     };
 
+    const handleDownloadReport = () => {
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+        const filename = `CENTINELA_REPORT_${timestamp}.txt`;
+        
+        let report = `--- PROTOCOLO CENTINELA: BLACK BOX REPORT ---\n`;
+        report += `Generated: ${new Date().toLocaleString()}\n`;
+        report += `Total Rounds Logged: ${gameState.history.matchLogs?.length || 0}\n\n`;
+
+        report += `=== SECTION 1: MATCH LOGS (LAST 100) ===\n`;
+        const logs = gameState.history.matchLogs || [];
+        logs.forEach((log) => {
+            report += `[R${log.round}] ${new Date(log.timestamp).toLocaleTimeString()} | Category: ${log.category} | Word: ${log.word}\n`;
+            report += `   > Impostors: ${log.impostors.join(', ')}\n`;
+            report += `   > Civilians: ${log.civilians.join(', ')}\n`;
+            if (log.isTroll) report += `   > [ALERT] TROLL EVENT: ${log.trollScenario}\n`;
+            if (log.architect) report += `   > [INFO] Architect: ${log.architect}\n`;
+            if (log.leteoGrade) report += `   > [CRITICAL] PROTOCOLO LETEO: GRADO ${log.leteoGrade} (E: ${log.entropyLevel})\n`;
+            report += `   > Paranoia Lvl: ${log.paranoiaLevel}% | Break Protocol: ${log.breakProtocol || 'None'}\n`;
+            report += `--------------------------------------------------\n`;
+        });
+
+        report += `\n=== SECTION 2: INFINITUM VAULT SNAPSHOT ===\n`;
+        const vault = gameState.history.playerStats;
+        Object.entries(vault).forEach(([key, value]) => {
+            const data = value as InfinityVault;
+            report += `PLAYER: ${key.toUpperCase()}\n`;
+            report += `   > Sessions: ${data.metrics.totalSessions} | Imp Ratio: ${(data.metrics.impostorRatio * 100).toFixed(1)}%\n`;
+            report += `   > Civil Streak: ${data.metrics.civilStreak} | Quarantine: ${data.metrics.quarantineRounds}\n`;
+            report += `   > Role History (Last 20): ${data.sequenceAnalytics.roleSequence.map(r => r ? 'IMP' : 'CIV').join('-')}\n`;
+            report += `\n`;
+        });
+
+        const blob = new Blob([report], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
     // Paranoia Visualization
     const pLevel = gameState.history.paranoiaLevel || 0;
     let pColor = "text-green-500";
@@ -81,6 +122,8 @@ export const DebugConsole: React.FC<Props> = ({ gameState, setGameState }) => {
     if (pLevel > 70) pColor = "text-red-500";
 
     const cooling = gameState.history.coolingDownRounds || 0;
+    const lastLeteo = gameState.history.lastLeteoRound || 0;
+    const isLeteoRecent = gameState.history.roundCounter - lastLeteo < 5;
 
     return (
         <div className="fixed top-0 left-0 w-full z-[100] bg-black/90 border-b border-amber-500/30 backdrop-blur-lg p-2 font-mono text-[10px] text-amber-500 shadow-2xl animate-in slide-in-from-top duration-300 max-h-[50vh] overflow-y-auto">
@@ -88,9 +131,12 @@ export const DebugConsole: React.FC<Props> = ({ gameState, setGameState }) => {
             <div className="flex justify-between items-center mb-2 border-b border-amber-500/20 pb-1">
                 <div className="flex items-center gap-2">
                     <Terminal size={12} className="animate-pulse" />
-                    <span className="font-bold tracking-widest">CENTINELA v6.1</span>
+                    <span className="font-bold tracking-widest">CENTINELA v6.3</span>
                 </div>
-                <div className="flex gap-2 text-xs">
+                <div className="flex gap-2 text-xs items-center">
+                    <button onClick={handleDownloadReport} title="Export Black Box" className="hover:text-white flex items-center gap-1 bg-amber-900/50 px-2 py-0.5 rounded border border-amber-500/30">
+                        <FileText size={10} /> EXPORT
+                    </button>
                     <span>VAULT: {Object.keys(gameState.history.playerStats).length}</span>
                 </div>
             </div>
@@ -138,10 +184,17 @@ export const DebugConsole: React.FC<Props> = ({ gameState, setGameState }) => {
                 <div className="space-y-2">
                     
                     {/* PARANOIA ENGINE */}
-                    <div className="bg-black/40 p-2 rounded border border-white/5">
+                    <div className="bg-black/40 p-2 rounded border border-white/5 relative overflow-hidden">
                         <h4 className="text-white/80 font-bold mb-1 flex items-center gap-1">
                             <Activity size={10} /> PARANOIA NETWORK
                         </h4>
+                        
+                        {isLeteoRecent && (
+                            <div className="absolute top-0 right-0 bg-purple-900/80 px-2 py-0.5 text-[8px] font-black text-purple-200 border-l border-b border-purple-500/50 flex items-center gap-1">
+                                <Zap size={8} /> LETEO ACTIVE
+                            </div>
+                        )}
+
                         <div className="flex items-center justify-between mb-1">
                             <span>ALERT LEVEL:</span>
                             <span className={`font-black ${pColor}`}>{pLevel}%</span>

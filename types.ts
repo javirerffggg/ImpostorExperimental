@@ -1,4 +1,5 @@
 
+
 export type ThemeName = 'midnight' | 'obsidian' | 'solar' | 'cyber' | 'bond' | 'turing' | 'illojuan' | 'material' | 'zenith' | 'protocol' | 'ethereal' | 'terminal84' | 'soft' | 'noir' | 'paper' | 'space' | 'nightclub';
 
 export interface ThemeConfig {
@@ -58,6 +59,23 @@ export interface InfinityVault {
     sequenceAnalytics: SequenceAnalytics;
 }
 
+export interface MatchLog {
+    id: string;
+    timestamp: number;
+    round: number;
+    category: string;
+    word: string;
+    impostors: string[]; // Names
+    civilians: string[]; // Names
+    isTroll: boolean;
+    trollScenario: string | null;
+    paranoiaLevel: number;
+    breakProtocol: string | null;
+    architect: string | null;
+    leteoGrade?: 0 | 1 | 2 | 3; // v6.3 LETEO Protocol
+    entropyLevel?: number;      // v6.3 LETEO Protocol
+}
+
 export type TrollScenario = 'espejo_total' | 'civil_solitario' | 'falsa_alarma';
 
 export interface DebugState {
@@ -91,6 +109,12 @@ export interface GameState {
         paranoiaLevel: number; // 0-100%
         coolingDownRounds: number; // 3, 2, 1, 0 (Rebote Post-Crisis)
         lastBreakProtocol: string | null; // For Debug/Logging
+        
+        // v6.3 LETEO Protocol
+        lastLeteoRound?: number;
+        
+        // v6.2 Black Box Logs
+        matchLogs: MatchLog[]; 
     };
     settings: {
         hintMode: boolean;

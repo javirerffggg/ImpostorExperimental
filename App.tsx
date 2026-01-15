@@ -403,7 +403,8 @@ function App() {
             playerStats: {}, // Infinity Vault
             lastTrollRound: -10,
             lastArchitectRound: -999,
-            lastStartingPlayers: []
+            lastStartingPlayers: [],
+            matchLogs: [] // v6.2
         };
 
         // Try to recover The Infinity Vault from LocalStorage
@@ -419,7 +420,8 @@ function App() {
                         globalWordUsage: parsed.globalWordUsage || {},
                         lastCategories: parsed.lastCategories || [],
                         lastArchitectRound: parsed.lastArchitectRound || -999,
-                        lastStartingPlayers: parsed.lastStartingPlayers || []
+                        lastStartingPlayers: parsed.lastStartingPlayers || [],
+                        matchLogs: parsed.matchLogs || []
                     };
                 }
             }
