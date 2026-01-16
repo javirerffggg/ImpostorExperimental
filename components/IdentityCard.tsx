@@ -1,3 +1,4 @@
+
 import React, { useRef, useState, useEffect } from 'react';
 import { GamePlayer, ThemeConfig, PartyIntensity } from '../types';
 import { Fingerprint, Shield, Skull, Eye, Play, ArrowRight, Lock, Beer } from 'lucide-react';
@@ -207,7 +208,8 @@ export const IdentityCard: React.FC<Props> = ({ player, theme, color, onRevealSt
                         top: '-20%',
                         left: '-20%',
                         background: `radial-gradient(circle, ${color}40 0%, ${color}00 70%)`,
-                        transform: `translate3d(${dragPosition.x}px, ${dragPosition.y + (isHolding ? -20 : 0)}px, 0) rotate(${dragPosition.x * 0.05}deg)`,
+                        // Updated translation to -40px
+                        transform: `translate3d(${dragPosition.x}px, ${dragPosition.y + (isHolding ? -40 : 0)}px, 0) rotate(${dragPosition.x * 0.05}deg)`,
                         transition: isDragging 
                             ? 'none' 
                             : 'transform 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
@@ -250,7 +252,8 @@ export const IdentityCard: React.FC<Props> = ({ player, theme, color, onRevealSt
                         
                         // ERGONOMICS v2.0: Reduced rotation for better reading stability
                         // BACCHUS: Add vertigo rotation
-                        transform: `translate3d(${dragPosition.x}px, ${dragPosition.y + (isHolding ? -20 : 0)}px, 0) rotate(${dragPosition.x * 0.03 + rotationOverride}deg)`,
+                        // Updated translation to -40px
+                        transform: `translate3d(${dragPosition.x}px, ${dragPosition.y + (isHolding ? -40 : 0)}px, 0) rotate(${dragPosition.x * 0.03 + rotationOverride}deg)`,
                         
                         animation: (isHolding && !player.isImp) ? 'reveal-pulse 2s infinite' : 'none',
                         touchAction: 'none',
@@ -294,24 +297,23 @@ export const IdentityCard: React.FC<Props> = ({ player, theme, color, onRevealSt
                         
                         {!isHolding ? (
                             <>
-                                {/* TOP: CLASSIFIED HEADER */}
-                                <div className="w-full text-center mt-2 animate-in fade-in slide-in-from-top-4 duration-700">
+                                {/* TOP: CLASSIFIED HEADER - Symmetrical & Synchronized */}
+                                <div className="w-full text-center animate-sync">
                                     <h3 
-                                        className="text-[10px] font-black uppercase tracking-[0.3em] opacity-90"
+                                        className="text-[10px] font-black uppercase tracking-[0.3em]"
                                         style={{ 
                                             backgroundImage: `linear-gradient(to right, ${theme.sub} 20%, #ffffff 50%, ${theme.sub} 80%)`,
                                             backgroundSize: '200% auto',
                                             WebkitBackgroundClip: 'text',
                                             WebkitTextFillColor: 'transparent',
-                                            animation: 'text-shimmer 3s linear infinite'
                                         }}
                                     >
                                         IDENTIDAD CLASIFICADA
                                     </h3>
                                 </div>
 
-                                {/* MIDDLE: LOCK ICON */}
-                                <div className="flex-1 flex items-center justify-center opacity-30 animate-pulse duration-1000">
+                                {/* MIDDLE: LOCK ICON - Symmetrical & Synchronized */}
+                                <div className="flex-1 flex items-center justify-center animate-sync">
                                     <div className="relative">
                                         <div className="absolute inset-0 bg-white/10 blur-2xl rounded-full transform scale-150" />
                                         <Lock 
@@ -322,8 +324,8 @@ export const IdentityCard: React.FC<Props> = ({ player, theme, color, onRevealSt
                                     </div>
                                 </div>
 
-                                {/* BOTTOM: FINGERPRINT */}
-                                <div className="flex flex-col items-center gap-4 animate-pulse mb-4">
+                                {/* BOTTOM: FINGERPRINT - Symmetrical & Synchronized */}
+                                <div className="flex flex-col items-center gap-4 animate-sync">
                                     <div 
                                         className="w-20 h-20 rounded-full border-2 flex items-center justify-center transition-colors duration-300 backdrop-blur-sm bg-black/10"
                                         style={{ borderColor: `${color}60` }}
@@ -508,6 +510,15 @@ export const IdentityCard: React.FC<Props> = ({ player, theme, color, onRevealSt
             </div>
 
             <style>{`
+                /* SYNCHRONIZED PULSE FOR IDLE STATE */
+                @keyframes sync-pulse {
+                    0%, 100% { opacity: 0.4; transform: scale(0.98); filter: brightness(0.9); }
+                    50% { opacity: 1; transform: scale(1.02); filter: brightness(1.2); }
+                }
+                .animate-sync {
+                    animation: sync-pulse 3s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+                }
+
                 @keyframes scan {
                     0% { top: -10%; opacity: 0; }
                     10% { opacity: 1; }

@@ -1,5 +1,6 @@
+
 import React, { useState, useEffect, useRef } from 'react';
-import { Settings, Users, Ghost, Zap, Shuffle, RotateCcw, Monitor, ChevronRight, X, Check, ShieldAlert, Mic, LayoutGrid, CheckCheck, Eye, Lock, Fingerprint, Save, Trash2, Database, Beer, PartyPopper, MessageCircle, AlertTriangle, FileWarning, BarChart3, ScanEye, Flame, Timer, Percent, ShieldCheck, Unlock, FileText, Radio, Droplets } from 'lucide-react';
+import { Settings, Users, Ghost, Zap, Shuffle, RotateCcw, Monitor, ChevronRight, X, Check, ShieldAlert, Mic, LayoutGrid, CheckCheck, Eye, Lock, Fingerprint, Save, Trash2, Database, Beer, PartyPopper, MessageCircle, AlertTriangle, FileWarning, BarChart3, ScanEye, Flame, Timer, Percent, ShieldCheck, Unlock, FileText, Radio, Droplets, Gavel } from 'lucide-react';
 import { Background } from './components/Background';
 import { IdentityCard } from './components/IdentityCard';
 import { PartyNotification } from './components/PartyNotification';
@@ -46,13 +47,31 @@ const ResultsView: React.FC<{
     const [scannedName, setScannedName] = useState("CALCULANDO...");
     const [vocalisLocked, setVocalisLocked] = useState(false);
 
+    // --- STOPWATCH STATE ---
+    const [timerSeconds, setTimerSeconds] = useState(0);
+
+    // Timer Logic
+    useEffect(() => {
+        if (isDecrypted) return;
+        const interval = setInterval(() => {
+            setTimerSeconds(s => s + 1);
+        }, 1000);
+        return () => clearInterval(interval);
+    }, [isDecrypted]);
+
+    const formatTime = (totalSeconds: number) => {
+        const m = Math.floor(totalSeconds / 60).toString().padStart(2, '0');
+        const s = (totalSeconds % 60).toString().padStart(2, '0');
+        return `${m}:${s}`;
+    };
+
     // Vocalis Effect
     useEffect(() => {
         if (isDecrypted) return; // Stop if already revealed
 
         let interval: number;
         let counter = 0;
-        const targetName = gameState.startingPlayer;
+        const targetName = gameState.startingPlayer || "Nadie";
         const allNames = gameState.players.map(p => p.name);
         
         // Scan phase (1.5s)
@@ -84,7 +103,7 @@ const ResultsView: React.FC<{
             if (navigator.vibrate) navigator.vibrate(30); // Low rumble
             interval = window.setInterval(() => {
                 setDecryptProgress(prev => {
-                    const next = prev + 3; // Speed of decryption
+                    const next = prev + 2; // Speed of decryption (Slower for dramatic effect)
                     return next >= 100 ? 100 : next;
                 });
             }, 16);
@@ -102,13 +121,33 @@ const ResultsView: React.FC<{
         }
     }, [decryptProgress, isDecrypted]);
 
-    // --- RENDER LOCKED SCREEN (CENSURA TOTAL + VOCALIS) ---
+    // --- RENDER LOCKED SCREEN (CENSURA TOTAL + VOCALIS + TIMER) ---
     if (!isDecrypted) {
         return (
-            <div className="flex flex-col h-full items-center justify-center p-6 pb-32 relative z-10 animate-in fade-in duration-500">
+            <div className="flex flex-col h-full items-center justify-between p-6 pb-12 relative z-10 animate-in fade-in duration-500 pt-[calc(2rem+env(safe-area-inset-top))]">
                 
+                {/* Header & Timer */}
+                <div className="w-full text-center space-y-4">
+                    <div className="flex items-center justify-center gap-2 opacity-70">
+                        <Mic size={16} className="text-red-500 animate-pulse" />
+                        <p style={{ color: theme.sub }} className="text-xs font-black uppercase tracking-[0.3em]">DEBATE EN CURSO</p>
+                    </div>
+                    <div className="relative">
+                        <h1 
+                            className="text-7xl font-black tracking-tighter tabular-nums"
+                            style={{ 
+                                color: theme.text,
+                                textShadow: `0 0 30px ${theme.accent}40`,
+                                fontFamily: "'JetBrains Mono', monospace" 
+                            }}
+                        >
+                            {formatTime(timerSeconds)}
+                        </h1>
+                    </div>
+                </div>
+
                 {/* VOCALIS WIDGET */}
-                <div className="w-full max-w-sm text-center relative z-20 mb-24">
+                <div className="w-full max-w-sm text-center relative z-20 flex-1 flex flex-col justify-center">
                     <h3 
                         className="text-xl font-bold uppercase tracking-[0.2em] transition-all duration-300"
                         style={{ color: theme.text, opacity: 0.9 }}
@@ -117,7 +156,7 @@ const ResultsView: React.FC<{
                     </h3>
                     
                     <div 
-                        className={`mt-6 text-5xl font-black uppercase tracking-tighter leading-none transition-all duration-300 transform-gpu ${vocalisLocked ? 'scale-110' : 'blur-[2px]'}`}
+                        className={`mt-6 text-5xl font-black uppercase tracking-tighter leading-none transition-all duration-300 transform-gpu break-words ${vocalisLocked ? 'scale-110' : 'blur-[2px]'}`}
                         style={{
                             color: vocalisLocked ? theme.accent : theme.text,
                             opacity: vocalisLocked ? 1 : 0.3,
@@ -126,55 +165,76 @@ const ResultsView: React.FC<{
                     >
                         {scannedName}
                     </div>
+
+                    {gameState.settings.partyMode && (
+                        <div className="mt-8 text-center opacity-80 animate-bounce">
+                            <p className="text-[10px] font-bold text-pink-400 uppercase tracking-widest border border-pink-500/30 px-3 py-1 rounded-full inline-block bg-pink-500/10">
+                                Modo Fiesta Activo
+                            </p>
+                        </div>
+                    )}
                 </div>
 
-                {/* AURA BUTTON */}
-                <div className="relative group">
-                    {/* Aura Layers */}
+                {/* ALONGATED BUTTON CONTAINER */}
+                <div className="relative w-full max-w-sm flex flex-col items-center justify-center mb-8">
+                    
+                    {/* EXPANDING AURA BEHIND */}
                     <div 
-                        className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full blur-2xl transition-all duration-500 ease-out
-                        ${isHoldingDecrypt ? 'w-56 h-56' : 'w-32 h-32 animate-pulse'}`} 
-                        style={{ backgroundColor: theme.accent, opacity: isHoldingDecrypt ? 0.4 : 0.1 }}
-                    />
-                    <div 
-                        className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full blur-3xl transition-all duration-500
-                        ${isHoldingDecrypt ? 'w-72 h-72' : 'w-0 h-0'}`}
-                        style={{ backgroundColor: theme.accent, opacity: 0.2 }}
+                        className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full blur-3xl transition-all duration-500 ease-out pointer-events-none
+                        ${isHoldingDecrypt ? 'w-[120%] h-48 opacity-50' : 'w-[90%] h-20 opacity-0'}`} 
+                        style={{ backgroundColor: theme.accent }}
                     />
 
-                    {/* The Button */}
+                    {/* THE ELONGATED BUTTON */}
                     <button
-                        className="relative w-28 h-28 rounded-full bg-black/20 border-2 backdrop-blur-md flex items-center justify-center overflow-hidden touch-none select-none transition-all duration-200 active:scale-95"
+                        className="relative w-full h-20 rounded-full border border-white/10 backdrop-blur-xl flex items-center justify-center overflow-hidden touch-none select-none transition-all duration-200 active:scale-[0.98] group"
                         style={{ 
-                            borderColor: isHoldingDecrypt ? theme.accent : `${theme.accent}50`,
-                            boxShadow: isHoldingDecrypt ? `0 0 20px ${theme.accent}80, inset 0 0 20px ${theme.accent}40` : 'none'
+                            borderColor: isHoldingDecrypt ? theme.accent : `${theme.accent}40`,
+                            backgroundColor: 'rgba(0,0,0,0.3)',
+                            boxShadow: isHoldingDecrypt ? `0 0 40px ${theme.accent}40` : 'none'
                         }}
                         onPointerDown={() => setIsHoldingDecrypt(true)}
                         onPointerUp={() => setIsHoldingDecrypt(false)}
                         onPointerLeave={() => setIsHoldingDecrypt(false)}
                     >
-                        {/* Fill Progress */}
+                        {/* Fill Progress - Horizontal Bar */}
                         <div 
-                            className="absolute bottom-0 left-0 w-full transition-all duration-75 ease-linear"
+                            className="absolute top-0 left-0 h-full transition-all duration-75 ease-linear"
                             style={{ 
-                                height: `${decryptProgress}%`,
-                                backgroundColor: theme.accent 
+                                width: `${decryptProgress}%`,
+                                backgroundColor: theme.accent,
+                                opacity: 0.8
                             }}
                         />
                         
-                        <Fingerprint 
-                            size={48} 
-                            className={`relative z-10 transition-all duration-300 ${isHoldingDecrypt ? 'scale-110 text-white' : 'scale-100'}`}
-                            style={{ color: isHoldingDecrypt ? '#fff' : theme.accent }}
-                        />
+                        {/* Shimmer Effect when idle */}
+                        {!isHoldingDecrypt && (
+                            <div className="absolute inset-0 -translate-x-full group-hover:animate-[shimmer_2s_infinite]" 
+                                 style={{ background: `linear-gradient(90deg, transparent, ${theme.accent}20, transparent)` }} 
+                            />
+                        )}
+
+                        {/* Content */}
+                        <div className="relative z-10 flex items-center gap-4 transition-all duration-300">
+                            <Fingerprint 
+                                size={32} 
+                                className={`transition-all duration-300 ${isHoldingDecrypt ? 'scale-110 text-white' : 'scale-100 opacity-80'}`}
+                                style={{ color: isHoldingDecrypt ? '#fff' : theme.accent }}
+                            />
+                            <div className="flex flex-col items-start">
+                                <span 
+                                    className={`text-xs font-black uppercase tracking-[0.2em] transition-colors duration-300 ${isHoldingDecrypt ? 'text-white' : 'text-white/90'}`}
+                                >
+                                    {isHoldingDecrypt ? (decryptProgress > 90 ? "ACCESO CONCEDIDO" : "ANALIZANDO...") : "MANTENER PARA RESOLVER"}
+                                </span>
+                                {!isHoldingDecrypt && (
+                                    <span style={{ color: theme.sub }} className="text-[9px] uppercase font-bold tracking-widest opacity-60">
+                                        Pulsación Larga
+                                    </span>
+                                )}
+                            </div>
+                        </div>
                     </button>
-                    
-                    <p 
-                        className={`absolute -bottom-12 left-1/2 -translate-x-1/2 w-max text-[10px] font-black uppercase tracking-widest transition-opacity duration-300 ${isHoldingDecrypt ? 'opacity-100' : 'opacity-70 animate-pulse'}`}
-                        style={{ color: theme.accent }}
-                    >
-                        MANTENER
-                    </p>
                 </div>
             </div>
         );
@@ -768,17 +828,16 @@ function App() {
                 setGameState(prev => ({ ...prev, currentPlayerIndex: prev.currentPlayerIndex + 1 }));
                 setHasSeenCurrentCard(false);
             } else {
-                // DIRECTLY TO RESULTS (Skip Discussion)
+                // GO TO RESULTS (ResultsView handles the "Discussion/Locked" phase internally)
                 setGameState(prev => ({ 
                     ...prev, 
                     phase: 'results',
                     currentDrinkingPrompt: "" 
                 }));
-                // Trigger results message (TRIBUNAL)
+                
+                // Trigger discussion prompt if party mode
                 if (gameState.settings.partyMode) {
-                    let winState: 'troll' | 'impostor' | 'civil' = Math.random() > 0.5 ? 'impostor' : 'civil';
-                    if (gameState.isTrollEvent) winState = 'troll';
-                    setTimeout(() => triggerPartyMessage('results', winState), 500);
+                    setTimeout(() => triggerPartyMessage('discussion'), 500);
                 }
             }
             setIsExiting(false);
@@ -1306,33 +1365,6 @@ function App() {
         );
     };
 
-    const renderDiscussion = () => {
-        return (
-            <div className="flex flex-col h-full items-center justify-center p-6 relative z-10 animate-in fade-in">
-                <div className="text-center mb-8">
-                     <Ghost size={48} className="mx-auto mb-4 opacity-50" style={{ color: theme.accent }} />
-                     <h2 style={{ color: theme.text, fontFamily: theme.font }} className="text-4xl font-black uppercase tracking-tighter mb-2">
-                        DEBATE
-                    </h2>
-                    <p style={{ color: theme.sub }} className="text-xs font-bold uppercase tracking-widest">
-                        ¿Quién es el impostor?
-                    </p>
-                </div>
-
-                <button 
-                    onClick={() => setGameState(prev => ({ ...prev, phase: 'results' }))}
-                    style={{ 
-                        backgroundColor: theme.accent,
-                        boxShadow: `0 0 20px ${theme.accent}40`
-                    }}
-                    className="px-8 py-4 rounded-full font-black text-white uppercase tracking-widest text-sm active:scale-95 transition-transform"
-                >
-                    Ver Veredicto
-                </button>
-            </div>
-        );
-    };
-
     const renderDrawer = () => (
         <div className={`fixed inset-0 z-50 transform transition-transform duration-300 ${settingsOpen ? 'translate-x-0' : 'translate-x-full'}`}>
             <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setSettingsOpen(false)} />
@@ -1496,8 +1528,8 @@ function App() {
             )}
 
             {gameState.phase === 'revealing' && renderReveal()}
-            {/* Discussion phase is effectively skipped, but render kept for type safety or future use */}
-            {gameState.phase === 'discussion' && renderDiscussion()} 
+            
+            {/* RESULTS PHASE which now handles the "Discussion/Starts Speaking" locked state internally */}
             {gameState.phase === 'results' && (
                 <ResultsView 
                     gameState={gameState} 
